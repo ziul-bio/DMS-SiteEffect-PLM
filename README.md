@@ -13,7 +13,7 @@
 
 ## About ViCAM:
 
-* Unified Molecular GPT
+* Viral fine-tuning of CAMbriam
 
 * 
 
