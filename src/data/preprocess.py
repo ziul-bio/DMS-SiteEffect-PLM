@@ -22,7 +22,8 @@ def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ra
     random.shuffle(records)
 
     #filter sequences with length < 2046
-    records = [record for record in records if len(record.seq) < 2048]
+    #records = [record for record in records if len(record.seq) < 2048]
+    records = [record for record in records if len(record.seq) < 2048 and 'poly' not in record.description]
 
     # Calculate split sizes
     total = len(records)
@@ -48,5 +49,5 @@ def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ra
 if __name__ == "__main__":
     # Example usage
     input_fasta = "data/raw/URVDBv29-prot_clustered.fasta"
-    output_dir = "data/processed/C-RVDBv29_maxlen2046"   
+    output_dir = "data/processed/C-RVDBv29_no_poly"   
     split_fasta(input_fasta, output_dir, train_ratio=0.9, val_ratio=0.05, test_ratio=0.05)
