@@ -6,6 +6,8 @@ from tqdm import tqdm
 from esm.models.esmc import ESMC
 from esm.tokenization import get_esmc_model_tokenizers
 
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 
 # Usage:
 #python extract_esmc.py -i data/DMS_metadata/IF1_ECOLI_muts.fasta -m /stor/work/Wilke/luiz/ViCAM/checkpoints/ViCAM_300M/v03_no_ploy/epoch=1-val_loss=1.73.ckpt -o embeddings/IF1_embeddings.pt
@@ -90,7 +92,7 @@ def main():
     parser.add_argument("-i", "--input_fasta", type=str, required=True, help="Path to the input FASTA file")
     parser.add_argument("-m", "--model_checkpoint", type=str, required=True, help="Model checkpoint identifier")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output file")
-    parser.add_argument('--device', type=str, default='cuda:2', help="Device to use for computation (default: cuda)")
+    parser.add_argument('--device', type=str, default='cuda:0', help="Device to use for computation (default: cuda)")
     args = parser.parse_args()
 
     # Define the input parameters
@@ -107,10 +109,14 @@ def main():
     # Load the model based on the checkpoint identifier
     if model_checkpoint == 'esmc-300m':
         model = ESMC.from_pretrained("esmc_300m").to(args.device) # "cuda" or "cpu"
+        model.to(torch.float32)
+        model.eval()
         print("Model transferred to device:", model.device)
     
     elif model_checkpoint == 'esmc-600m':
         model = ESMC.from_pretrained("esmc_600m").to(args.device)
+        model.to(torch.float32)
+        model.eval()
         print("Model transferred to device:", model.device)
     
     elif 'esmc' not in model_checkpoint:

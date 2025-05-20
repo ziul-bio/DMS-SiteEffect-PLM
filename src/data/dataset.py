@@ -87,9 +87,8 @@ class MLM:
 
 
 class MyDataset(Dataset):
-    """This class just loads the data and return a dataset object, returning the sequences and targets.
-    Without any tokenization or padding. This will be handled later in the collate_fn.
-    # This class also randomize the SMILES strings, using a non-canonical SMILES representation.
+    """This function collates a batch, tokenizes and pads the sequences,
+    and applies the MLM masking strategy to produce inputs and targets.
     """
     def __init__(self, sequences):
         self.sequences = sequences

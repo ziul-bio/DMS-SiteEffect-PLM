@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.optim import AdamW 
-from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, ConstantLR, CosineAnnealingLR
 
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger 
@@ -13,12 +13,18 @@ from src.data.dataset import MyDataModule
 torch.set_float32_matmul_precision('medium')
 from pytorch_lightning.tuner.tuning import Tuner
 
+from src.model.model_config import config2
+
 
 ################ pytorch lightning model ######################
 class LitModel(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
-        self.model= Load_from_pretrained(args.checkpoint_path).get_model_details()
+        if not args.resume:
+            self.model= Load_from_pretrained(args.checkpoint_path).get_model_details()
+        else:
+            self.model = LitModel.load_from_checkpoint(args.checkpoint_resume)
+        
         self.learning_rate = args.learning_rate
         self.weight_decay = args.weight_decay
         self.beta1 = args.beta1
@@ -63,23 +69,27 @@ class LitModel(pl.LightningModule):
         return loss, perplexity
 
 
-    def configure_optimizers(self):
-        Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
-        LRscheduler = {
-            #'scheduler': CosineAnnealingLR(Optimizer, T_max=10, eta_min=self.learning_rate*0.1),
-            'scheduler': ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0),
-            'interval': 'epoch',  
-            'frequency': 1,       
-            'monitor': 'val_loss', # only for ReduceLROnPlateau
-        }
-        return {"optimizer": Optimizer, "lr_scheduler": LRscheduler}    
-        #return Optimizer
+    # def configure_optimizers(self):
+    #     Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
+    #     LRscheduler = CosineAnnealingLR(Optimizer, T_max=10, eta_min=self.learning_rate*0.1),
+    #     LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0),
+    #     return {"optimizer": Optimizer, "lr_scheduler": LRscheduler}    
+    #     #return Optimizer
         
-
+    def configure_optimizers(self):
+        warmup_iters = 10000
+        tmax = 80000
+        optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
+        warmup = LinearLR(optimizer, start_factor=0.1, total_iters=warmup_iters)                   # total iterations that warmup will last. warms up to 0.01*learning_rate
+        decay = ConstantLR(optimizer, factor=1.0, total_iters=tmax)
+        #decay = CosineAnnealingLR(optimizer, T_max=tmax, eta_min=self.learning_rate * 0.1)          # T_max is the number of iterations for cosine annealing. decays to 0.01*learning_rate
+        scheduler = SequentialLR(optimizer, schedulers=[warmup, decay], milestones=[warmup_iters])  # milestones means when to switch from warm up to lr decay
+        return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
 
 
 def main(args):
+
     dataset_name = args.dataDir.split('/')[-2]
     print(f"Dataset name: {dataset_name}")
     datamodule = MyDataModule(args)
@@ -112,12 +122,11 @@ def main(args):
         
     trainer = pl.Trainer(
         accelerator="gpu",
-        #strategy="ddp",
-        devices=1, #[0, 1, 2, 3],          # [0, 1] for 2 GPUs, or -1 for all available GPUs
-        #accumulate_grad_batches=4,          # simulate a 4× larger batch size (so 3x4=16)
-        max_epochs= args.epochs,
-        max_steps=200000,                    
-        val_check_interval=50000,
+        strategy="ddp",
+        devices=[3], #[0, 1, 2, 3],          # [0, 1] for 2 GPUs, or -1 for all available GPUs
+        #accumulate_grad_batches=100,          # simulate a × larger batch size (so 3x4=16)
+        max_epochs= args.epochs,                 
+        val_check_interval=2000,
         enable_checkpointing=True,
         gradient_clip_val=1.0,               # Clip gradients if they exceed 1.0
         logger=logger,
@@ -127,11 +136,11 @@ def main(args):
     ##################### Finding learning rate #####################
     if args.LRfinder:
         tuner = Tuner(trainer)
-        lr_finder = tuner.lr_find(model, datamodule, min_lr=1e-8, max_lr=1e-3, num_training=100)
-        fig = lr_finder.plot(suggest=True)
-        lr_suggestion = round(lr_finder.suggestion(), 10)
+        lr_finder = tuner.lr_find(model, datamodule, min_lr=1e-10, max_lr=1e-2, num_training=100)
+        fig = lr_finder.plot(suggest=True)                                                                     # type: ignore
+        lr_suggestion = round(lr_finder.suggestion(), 10)                                                      # type: ignore
         print(f"Suggested learning rate: {lr_suggestion}")
-        fig.savefig(f"logs/{args.output}/LRfind_{lr_suggestion}.png")
+        fig.savefig(f"logs/{args.output}/LRfind_{lr_suggestion}.png")                                          # type: ignore
 
     
     ########################### Training ##########################    
@@ -150,17 +159,17 @@ def main(args):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen2046/')
-    #parser.add_argument('-i', '--dataDir', type=str, default='data/processed/example/')
+    parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_no_poly_20aa/')
     parser.add_argument('-o', '--output', type=str, default=None)
     parser.add_argument('--batch_size', type=int, default=6)
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--resume', action='store_true')
-    parser.add_argument('--learning_rate', type=float, default=5e-4)
-    parser.add_argument('--weight_decay', type=float, default=1e-2)
+    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--learning_rate', type=float, default=1e-6)
+    parser.add_argument('--weight_decay', type=float, default=1e-6)
     parser.add_argument('--beta1', type=float, default=0.9)
-    parser.add_argument('--beta2', type=float, default=0.95)
+    parser.add_argument('--beta2', type=float, default=0.99)
     parser.add_argument('--checkpoint_path', type=str, default='/stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth')
+    parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--checkpoint_resume', type=str)
     parser.add_argument('--LRfinder', action='store_true')
     args = parser.parse_args()
     main(args)
@@ -170,4 +179,4 @@ if __name__ == '__main__':
 
 ###### RUNNING EXAMPLES ######  
 # # this version I reduced the weight decay to 1e-2  
-# CUDA_VISIBLE_DEVICES=2 python src/training/train.py -o ViCAM_300M/test_5e4_RLRP 
+# CUDA_VISIBLE_DEVICES=2 python src/training/train.py -o ViCAM_300M/test_lr_finder --LRfinder

@@ -25,6 +25,8 @@ def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ra
     #records = [record for record in records if len(record.seq) < 2048]
     records = [record for record in records if len(record.seq) < 2048 and 'poly' not in record.description]
 
+    
+
     # Calculate split sizes
     total = len(records)
     train_size = int(total * train_ratio)
