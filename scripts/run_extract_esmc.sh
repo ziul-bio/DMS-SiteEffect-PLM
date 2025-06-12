@@ -11,13 +11,14 @@ files=(
 
     )
 
-MODEL_checkpoint='checkpoints/ViCAM_300M/CRVDBv29_maxLen2046_20aa_Full_lr1e6/epoch=9-val_loss=1.52.ckpt'
-version='CRVDBv29_maxLen2046_20aa_Full_lr1e6'
+MODEL_checkpoint='esmc-300m'
+version='esmc_300m'
 
+echo "Extracting embedding using model: $MODEL_checkpoint"
 for file in "${files[@]}"
 do
     echo "Extracting embedding for $file:"
-    python scripts/extract_esmc.py -m $MODEL_checkpoint -i "data/DMS_muts/${file}_muts.fasta"  -o "embeddings/ViCAM/${version}/${file}_embeddings.pt"
-
+    #python scripts/extract_esmc.py -m $MODEL_checkpoint -i "data/DMS_muts/${file}_muts.fasta"  -o "embeddings/ViCAM/${version}/${file}_embeddings.pt"
+    python scripts/extract_esmc.py -m $MODEL_checkpoint -i "data/DMS_muts/${file}_muts.fasta"  -o "embeddings/${version}/${file}_embeddings.pt"
 done
                 
