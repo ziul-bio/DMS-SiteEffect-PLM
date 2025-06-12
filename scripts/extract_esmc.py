@@ -6,15 +6,11 @@ from tqdm import tqdm
 from esm.models.esmc import ESMC
 from esm.tokenization import get_esmc_model_tokenizers
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 # Usage:
-#python scripts/extract_esmc.py -i data/DMS_muts/PA_FLU_Sun2015_muts.fasta -m checkpoints/logs/ViCAM_300M/CRVDBv29_noPoly_Frz3_lr5e4_RLRP_v02/epoch=7-val_loss=1.47.ckpt -o embeddings/ViCAM/CRVDBv29_noPoly_Frz3_lr5e4_RLRP/PA_FLU_Sun2015_embeddings_v02.pt
-#python scripts/extract_esmc.py -i data/DMS_muts/PA_FLU_Sun2015_muts.fasta -m checkpoints/ViCAM_300M/CRVDBv29_noPoly_Frz3_lr5e4_RLRP/epoch=9-val_loss=1.46.ckpt -o embeddings/ViCAM/CRVDBv29_noPoly_Frz3_lr5e4_RLRP/PA_FLU_Sun2015_embeddings_v02.pt
-
-#python scripts/extract_esmc.py -i data/DMS_muts/PA_FLU_Sun2015_muts.fasta -m checkpoints/ViCAM_300M/CRVDBv29_maxLen2046_20aa_Frz3_lr5e4_CALR/epoch=2-val_loss=1.67.ckpt -o embeddings/ViCAM/CRVDBv29_maxLen2046_20aa_Frz3_lr5e4_CALR/PA_FLU_Sun2015_embeddings.pt
-#python scripts/extract_esmc.py -i data/DMS_muts/HG_FLU_Bloom2016_muts.fasta -m checkpoints/ViCAM_300M/CRVDBv29_maxLen2046_20aa_Frz3_lr5e4_CALR/epoch=2-val_loss=1.67.ckpt -o embeddings/ViCAM/CRVDBv29_maxLen2046_20aa_Frz3_lr5e4_CALR/HG_FLU_Bloom2016_embeddings.pt
+#python extract_esmc.py -i data/DMS_metadata/IF1_ECOLI_muts.fasta -m /stor/work/Wilke/luiz/ViCAM/checkpoints/ViCAM_300M/v03_no_ploy/epoch=1-val_loss=1.73.ckpt -o embeddings/IF1_embeddings.pt
 
 
 class FastaDataLoader:
@@ -75,13 +71,12 @@ def extract_mean_representations(model, fasta_file):
     
     with torch.no_grad():  # Disable gradient calculations
         for batch_ids, batch_lengths, batch_tokens in tqdm(data_loader, desc="Processing batches", leave=False):
-            with torch.autocast(device_type='cuda', enabled=False):
-                output = model(batch_tokens)
-                logits, embeddings, hiddens = (
-                    output.sequence_logits,
-                    output.embeddings,
-                    output.hidden_states,
-                )
+            output = model(batch_tokens)
+            logits, embeddings, hiddens = (
+                output.sequence_logits,
+                output.embeddings,
+                output.hidden_states,
+            )
 
             for i, ID in enumerate(batch_ids):
             # Extract the last hidden states for the sequence
@@ -129,7 +124,6 @@ def main():
         state_dict = torch.load(args.model_checkpoint, map_location=args.device, weights_only=True)['state_dict']
         new_state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
         model.load_state_dict(new_state_dict)
-        model.to(torch.float32)
         model.to(args.device)
         model.eval()
         print("Model transferred to device:", model.device)
