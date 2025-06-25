@@ -8,7 +8,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 # my modules
-from src.model.ESMC2ne import Load_from_pretrained
+from src.model.ESMC import Load_from_pretrained
 from src.data.dataset import MyDataModule
 torch.set_float32_matmul_precision('medium')
 from pytorch_lightning.tuner.tuning import Tuner
@@ -73,16 +73,20 @@ class LitModel(pl.LightningModule):
         #LRscheduler = CosineAnnealingLR(Optimizer, T_max=10, eta_min=self.learning_rate*0.1),
         #return {"optimizer": Optimizer, "lr_scheduler": LRscheduler}    
         LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0) # It decays exponentially, by 10% each time it's triggered.
-        return {"optimizer": Optimizer, "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss"}}    
+        #return {"optimizer": Optimizer, "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss"}}    
+        return {
+            "optimizer": Optimizer,
+            "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss", "interval": "epoch", "frequency": 1}
+            }
         
     # def configure_optimizers(self):
-    #     warmup_iters = 10000
-    #     tmax = 80000
+    #     warmup_epochs = 1
+    #     tmax_epochs = args.epochs
     #     optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
-    #     warmup = LinearLR(optimizer, start_factor=0.1, total_iters=warmup_iters)                     # total iterations that warmup will last. warms up to 0.01*learning_rate
-    #     decay = ConstantLR(optimizer, factor=1.0, total_iters=tmax)
-    #     #decay = CosineAnnealingLR(optimizer, T_max=tmax, eta_min=self.learning_rate * 0.1)          # T_max is the number of iterations for cosine annealing. decays to 0.01*learning_rate
-    #     scheduler = SequentialLR(optimizer, schedulers=[warmup, decay], milestones=[warmup_iters])   # milestones means when to switch from warm up to lr decay
+    #     warmup = LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)                                         # total iterations that warmup will last. warms up to 0.01*learning_rate
+    #     #decay = ConstantLR(optimizer, factor=1.0, total_iters=tmax)
+    #     decay = CosineAnnealingLR(optimizer, T_max=tmax_epochs - warmup_epochs, eta_min=self.learning_rate * 0.01)         # T_max is the number of iterations for cosine annealing. decays to 0.01*learning_rate
+    #     scheduler = SequentialLR(optimizer, schedulers=[warmup, decay], milestones=[warmup_epochs])                        # milestones means when to switch from warm up to lr decay
     #     return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
 
@@ -108,13 +112,13 @@ def main(args):
         filename="{epoch}-{val_loss:.2f}",  
         save_on_train_epoch_end=True,
         monitor="val_loss",               
-        save_top_k=2,                      
-        mode="min",                         # Mode for monitoring (min for loss, max for accuracy, etc.)
+        save_top_k=5,                      
+        mode="min",                             # Mode for monitoring (min for loss, max for accuracy, etc.)
     )
     
     early_stopping_callback = EarlyStopping(
         monitor='val_loss',
-        patience=5,                          # I am looking for 5 epochs, so patience=5*number of checks per epoch
+        patience=5,                            # I am looking for 5 epochs, so patience=5*number of checks per epoch
         mode='min',
         min_delta=0.001,
     )
@@ -122,8 +126,8 @@ def main(args):
     trainer = pl.Trainer(
         accelerator="gpu",
         strategy="ddp",
-        devices=[3], #[0, 1, 2, 3],          # [0, 1] for 2 GPUs, or -1 for all available GPUs
-        #accumulate_grad_batches=100,          # simulate a × larger batch size (so 3x4=16)
+        devices=[3], #[0, 1, 2, 3],            # [0, 1] for 2 GPUs, or -1 for all available GPUs
+        #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80)
         max_epochs= args.epochs,                 
         #val_check_interval=5000,
         enable_checkpointing=True,
@@ -158,10 +162,10 @@ def main(args):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_no_poly_20aa/')
+    parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen2046_20aa/')
     parser.add_argument('-o', '--output', type=str, default=None)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=40)
+    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--model_checkpoint', type=str, default='esmc_300m')
     parser.add_argument('--LRfinder', action='store_true')
     parser.add_argument('--resume', action='store_true')
@@ -174,5 +178,5 @@ if __name__ == '__main__':
 
 ###### RUNNING EXAMPLES ######  
 # python src/training/train.py -o ViCAM_300M/test_lr_finder --LRfinder
-# python src/training/train.py -o logs/ViCAM_300M/CRVDBv29_noPoly_Frz3_lr5e4_RLRP_v02
-# python src/training/train.py -o logs/ViCAM_300M/CRVDBv29_noPoly_Frz3_lr5e4_RLRP --resume --checkpoint_resume checkpoints/ViCAM_300M/CRVDBv29_noPoly_Frz3_lr5e4_RLRP/epoch=9-val_loss=1.46.ckpt  
+# python src/training/train.py -o ViCAM_300M/CRVDBv29_maxLen2046_Full_lr5e4_RLRP
+# python src/training/train.py -o ViCAM_300M/CRVDBv29_maxLen2046_Full_lr5e4_RLRP --resume --checkpoint_resume checkpoints/ViCAM_300M/CRVDBv29_noPoly_Frz3_lr5e4_RLRP/epoch=9-val_loss=1.46.ckpt  

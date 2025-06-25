@@ -9,20 +9,19 @@ from esm.tokenization import get_esmc_model_tokenizers
 
 
 class Load_from_pretrained:
-    def __init__(self, checkpoint_path):
-        self.checkpoint_path = checkpoint_path
-
+    def __init__(self, model_checkpoint):
         # load and define the model
-        if 'esmc_300m' in self.checkpoint_path:
-            self.model = self.ESMC_300M_202412(self.checkpoint_path)
+        if 'esmc_300m' in model_checkpoint:
+            checkpoint_path = '/stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth'
+            self.model = self.ESMC_300M_202412(checkpoint_path)
 
-        elif 'esmc_600m' in self.checkpoint_path:
-            self.model = self.ESMC_600M_202412(self.checkpoint_path)
+        elif 'esmc_600m' in model_checkpoint:
+            checkpoint_path = '/stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_600m_2024_12_v0.pth'
+            self.model = self.ESMC_600M_202412(checkpoint_path)
         
         else:
-            raise ValueError("Invalid model name. Please use esmc_300m_2024_12_v0.pth or esmc_600m_2024_12_v0.pth.")
-
-
+            raise ValueError("Invalid model name. Please use esmc_300m or esmc_600m.")
+        
 
     # load the models locally
     def ESMC_300M_202412(self, model_path: str, device: torch.device | str = "cpu"):
