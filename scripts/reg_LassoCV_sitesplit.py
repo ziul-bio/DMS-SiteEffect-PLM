@@ -55,12 +55,12 @@ def split_data(df, seed, train_pct=0.8, test_pct=0.2):
         return
 
     df_size = df.shape[0]
-    df_testpct = df_size*test_pct
+    df_test_size = df_size*test_pct
     test_sites, train_sites = [], []
 
     # determine sites for test, then train
     for site in sites:
-        if len(test_sites) <= df_testpct:
+        if len(test_sites) <= df_test_size:
             test_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
         else:
             train_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
@@ -134,6 +134,7 @@ def run_regression_on_compressed_files(path_compressed_embed_file, path_meta_dat
     '''Run regression on compressed embeddings'''
     
     meta_data = pd.read_csv(path_meta_data)
+    meta_data = meta_data.query("mutant != 'WT'")
     results = pd.DataFrame()
 
     # load and merge the data with features
@@ -176,6 +177,7 @@ def run_regression_on_compressed_files(path_compressed_embed_file, path_meta_dat
         num_nonzero_coefs.append(num_nonzero_coef)
 
         print(f"Results:  fold {fold}, r2_train: {r2_train:.3f}, r2_test: {r2_test:.3f}, Num coefs: {num_nonzero_coef}")
+    print(f"Results:  r2_train: {np.mean(r2s_train):.3f}, r2_test: {np.mean(r2s_test):.3f}, Num coefs: {np.mean(num_nonzero_coefs)}")
     
     res = save_results(folds, r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, num_nonzero_coefs)
     results = pd.concat([results, res], axis=0)
