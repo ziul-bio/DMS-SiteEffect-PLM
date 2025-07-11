@@ -131,7 +131,7 @@ def main(args):
         max_epochs= args.epochs,                 
         #val_check_interval=5000,
         enable_checkpointing=True,
-        gradient_clip_val=1.0,               # Clip gradients if they exceed 1.0
+        gradient_clip_val=1.0,                 # Clip gradients if they exceed 1.0
         logger=logger,
         callbacks=[early_stopping_callback, checkpoint_callback],
     )
@@ -143,7 +143,7 @@ def main(args):
         fig = lr_finder.plot(suggest=True)                                                                     # type: ignore
         lr_suggestion = round(lr_finder.suggestion(), 10)                                                      # type: ignore
         print(f"Suggested learning rate: {lr_suggestion}")
-        fig.savefig(f"logs/{config['output']}/LRfind_{lr_suggestion}.png")                                          # type: ignore
+        fig.savefig(f"logs/{config['output']}/LRfind_{lr_suggestion}.png")                                     # type: ignore
 
     
     ########################### Training ##########################    
