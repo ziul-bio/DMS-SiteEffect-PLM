@@ -35,13 +35,13 @@ class RegressionHead(nn.Module):
         self.layer_norm = nn.LayerNorm(embed_dim)  # Normalize hidden states
         self.out_proj = nn.Linear(embed_dim, num_classes) 
         self.dropout = nn.Dropout(hidden_dropout)
-        #self.gelu = nn.GELU()  # Use GELU activation function
+        self.gelu = nn.GELU()  # Use GELU activation function
 
     def forward(self, features):
         x = features[:, 0, :]  # CLS token
         x = self.dense(x)
         x = self.layer_norm(x)  # Helps stabilize training
-        #x = self.gelu(x)  
+        x = self.gelu(x)  
         x = self.dropout(x) 
         logits = self.out_proj(x)
         return logits
@@ -133,7 +133,7 @@ class Load_from_pretrained:
         # freeze all layers but last one
         print("Freezing all layers but the last two...")
         num_layers = len(self.model.transformer.blocks)
-        n_trainable = 1
+        n_trainable = 2
         # trainable_blocks = ["transformer.blocks.28.", "transformer.blocks.29."]
         trainable_blocks = [f"transformer.blocks.{i}." for i in range(num_layers - n_trainable, num_layers)] # from last-2 to last layer
         for name, param in self.model.named_parameters():
@@ -162,19 +162,14 @@ if __name__ == "__main__":
     args = ArgumentParser()
     args.add_argument('--checkpoint_path', type=str, default='/stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth')
     #args.add_argument('--checkpoint_path', type=str, default='checkpoints/vicam_300m/CRVDBv29_maxLen2046_20aa_Full_RLRP_lr1e6/epoch=9-val_loss=1.52.ckpt')
-    args.add_argument('-i', '--dataDir', type=str, default='data/processed/example/')
-    args.add_argument('--batch_size', type=int, default=2)
     args = args.parse_args()
-    
-    # print("Loading model for testing")
-    # data_module = MyDataModule(args)
-    # data_module.setup()
-    # train_loader = data_module.train_dataloader()
 
-    # model_name = 'ESM C' + args.checkpoint_path.split("/")[-1].split("_")[1]
-    # print(f"Model name: {model_name}")
-    # print(f"Model loaded from path: {args.checkpoint_path}\n")
 
     model = Load_from_pretrained(args.checkpoint_path, num_classes=1, dropout=0.1)
     model= model.get_model_details()
-    print(model)
+
+    for name, param in model[0].named_parameters():
+        if param.requires_grad:
+            print(name, param.requires_grad)
+    
+    #print(model)
