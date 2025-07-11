@@ -4,6 +4,7 @@ from ESMC_partial import Load_from_pretrained
 
 import argparse
 import pandas as pd
+import random
 
 import torch
 from torch.optim import AdamW
@@ -20,23 +21,28 @@ from pytorch_lightning.tuner.tuning import Tuner
 
 
 #python scripts/LitESMC_partial_trainer.py -i data/DMS_mut_metadata/HG_FLU_Bloom2016_metadata.csv -o experiments/fineTune/esmc-300m/partial --checkpoint_path /stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth
+#python scripts/LitESMC_partial_trainer.py -i data/nonviral/metadata/BLAT_ECOLX_Ranganathan2015_metadata.csv -o experiments/fineTune/esmc-300m/partial --checkpoint_path /stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth
 #python scripts/LitESMC_partial_trainer.py -i data/DMS_mut_metadata/HG_FLU_Bloom2016_metadata.csv -o experiments/fineTune/vicam-300m/partial --checkpoint_path checkpoints/vicam_300m/CRVDBv29_maxLen2046_20aa_Full_RLRP_lr1e6/epoch=9-val_loss=1.52.ckpt
 
-#python scripts/LitESMC_partial_trainer.py -i data/DMS_mut_metadata/POLG_HCVJF_Sun2014_metadata.csv -o experiments/fineTune/esmc-300m/partial --checkpoint_path /stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth
-#python scripts/LitESMC_partial_trainer.py -i data/DMS_mut_metadata/POLG_HCVJF_Sun2014_metadata.csv -o experiments/fineTune/esmc-600m/partial --checkpoint_path /stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_600m_2024_12_v0.pth
+#python scripts/LitESMC_partial_trainer.py -i data/DMS_mut_metadata/OmiXBB15_spike_ACE2bind_Dadonaite2024_metadata.csv -o experiments/fineTune/esmc-300m/ --checkpoint_path /stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth
+#python scripts/LitESMC_partial_trainer.py -i data/DMS_mut_metadata/OmiXBB15_spike_ACE2bind_Dadonaite2024_metadata.csv -o experiments/fineTune/esmc-600m/ --checkpoint_path /stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_600m_2024_12_v0.pth
+
+# CUDA_VISIBLE_DEVICES=3 python scripts/LitESMC_partial_trainer.py -i data/nonviral/metadata/BLAT_ECOLX_Ranganathan2015.csv -o results/fineTune/test/partial/esmc-300m  --seed 13 --split_strategy pool_split --checkpoint_path /stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training script arguments.")
     parser.add_argument("-i", "--data", type=str, required=True, help="Path to input CSV file.")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output CSV file path.")
+    parser.add_argument("--split_strategy", type=str, default="pool_split", help="Split strategy to use.")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
     parser.add_argument("--checkpoint_path", type=str, required=True, help="Model checkpoint name or full path.")
     parser.add_argument("--num_classes", type=int, default=1, help="Number of classes (1 for regression).")
-    parser.add_argument("--epochs", type=int, default=40, help="Number of epochs.")
+    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
     parser.add_argument("--device", type=str, default=("cuda" if torch.cuda.is_available() else "cpu"), help="Device for training.")
-    parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate.")
-    parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay.")
-    parser.add_argument("--dropout", type=float, default=0.1, help="CLS dropout probability.")
+    parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate.")
+    parser.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay.")
+    parser.add_argument("--dropout", type=float, default=0.2, help="CLS dropout probability.")
     return parser.parse_args()
 
 
@@ -61,28 +67,63 @@ class MyDataset(Dataset):
         return sequences, target
 
 
+def split_data(df, seed, train_pct=0.8, val_pct=0.2):
+    """
+    This function randomly splits a dataframe into train, validation data given a seed by mutation site.
+    Parameters:
+     - df (DataFrame): dataframe containing information about mutants. Mutants should be in the order wt amino acid, site of mutation, mutant amino acid. ex "M1F"
+     - seed (int): the seed to be used when shuffling sites randomly.
+     - train_pct (float): the percentage of data that will be split into the train dataset. Default is 0.8
+     - val_pct (float): the percentage of data that will be split into the validation dataset. Default is 0.2
+
+    Returns:
+     - train_df (DataFrame): the DataFrame containing selected data by site to be used as the train dataset.
+     - val_df (DataFrame): the DataFrame containing selected data by site to be used as the validation dataset.
+    """
+    # find sites of mutation and order randomly
+    df["site"] = [int(s[1:-1]) for s in df["mutant"]]
+    sites = df["site"].unique()
+    random.seed(seed)
+    random.shuffle(sites)
+
+    if train_pct + val_pct != 1:
+        print("Split percentages must sum to 1")
+        return
+
+    df_size = df.shape[0]
+    df_val_size = df_size*val_pct
+    val_sites, train_sites = [], []
+
+    # determine sites for validation, then train
+    for site in sites:
+        if len(val_sites) <= df_val_size:
+            val_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
+        else:
+            train_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
+
+    # subset df for train, val data
+    train_df = df[df["site"].isin(set(train_sites))]
+    val_df = df[df["site"].isin(set(val_sites))]
+    return train_df, val_df
+
 
 class MyDataModule(pl.LightningDataModule):
     def __init__(self, tokenizer, args):
         super().__init__()
         self.args = args
         self.tokenizer = tokenizer
-        
+        self.split_strategy = args.split_strategy # 'pool_split' or 'site_split'
+        self.seed = args.seed 
+
     def setup(self, stage=None):
         data = pd.read_csv(args.data)
+        if self.split_strategy == 'site_split':
+            train_df, val_df = split_data(data, seed=self.seed, train_pct=0.8, val_pct=0.2)
+        elif self.split_strategy == 'pool_split':
+            train_df, val_df = train_test_split(data, random_state=self.seed, test_size=0.2)
 
-        train_df, val_df = train_test_split(data, test_size=0.2, random_state=42)
         self.train_dataset = MyDataset(train_df)
         self.val_dataset = MyDataset(val_df)
-
-        # dataset = MyDataset(data)
-        # # Use random_split to split the dataset into train and validation sets
-        # train_size = int(0.8 * len(dataset))
-        # val_size = len(dataset) - train_size
-        # self.train_dataset, self.val_dataset = random_split(
-        #     dataset, [train_size, val_size],
-        #     generator=torch.Generator().manual_seed(42)
-        #     )
        
     def collate_fn(self, batch):
         """This function will be used to collate the data into a batch.
@@ -181,7 +222,7 @@ def main():
     args = parse_args()
     model_name = [x for x in ['vicam_300m', 'vicam_600m','esmc_300m', 'esmc_600m'] if x in args.checkpoint_path][0]
     print(f"Model name: {model_name}")
-    dataset_name = args.data.split("/")[-1].split("_metadata.csv")[0]
+    dataset_name = args.data.split("/")[-1].split(".csv")[0]
     print(f"Dataset name: {dataset_name}")
 
 
@@ -195,18 +236,18 @@ def main():
             #save_dir=os.path.join(f"{args.output}", f"{model_name}"),
             save_dir=os.path.join(f"{args.output}"),
             name=f"{dataset_name}",
-            version="",)
-        
+            version=f'{args.split_strategy}/seed_{args.seed}',)
+
     trainer = pl.Trainer(
         accelerator="gpu",
         #strategy="ddp",
-        devices=[3],                        # [0, 1] for 2 GPUs, or -1 for all available GPUs
+        devices=1,                           # [0, 1] for 2 GPUs, or -1 for all available GPUs
         #accumulate_grad_batches=4,          # simulate a 4× larger batch size (so 3x4=16)
         max_epochs= args.epochs,
         enable_checkpointing=False,
-        gradient_clip_val=1.0,              # Clip gradients if they exceed 1.0
+        gradient_clip_val=1.0,               # Clip gradients if they exceed 1.0
         logger=logger,
-        callbacks=[EarlyStopping(monitor="val_loss", patience=5, mode="min")],
+        callbacks=[EarlyStopping(monitor="val_loss", patience=10, mode="min")],
     )     
     
     trainer.fit(model, datamodule)
