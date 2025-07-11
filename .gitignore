@@ -1,0 +1,7 @@
+venv/
+checkpoints/
+logs/
+embeddings/
+experiments/
+
+*.pyc
