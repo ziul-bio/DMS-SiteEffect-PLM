@@ -126,7 +126,7 @@ def main(args):
     trainer = pl.Trainer(
         accelerator="gpu",
         strategy="ddp",
-        devices=[3], #[0, 1, 2, 3],            # [0, 1] for 2 GPUs, or -1 for all available GPUs
+        devices=2, #[0, 1, 2, 3],            # [0, 1] for 2 GPUs, or -1 for all available GPUs
         #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80)
         max_epochs= args.epochs,                 
         #val_check_interval=5000,
@@ -162,9 +162,9 @@ def main(args):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen2046_20aa/')
+    parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen1022_20aa/')
     parser.add_argument('-o', '--output', type=str, default=None)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--model_checkpoint', type=str, default='esmc_300m')
     parser.add_argument('--LRfinder', action='store_true')

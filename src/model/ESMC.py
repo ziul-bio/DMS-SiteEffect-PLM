@@ -12,11 +12,11 @@ class Load_from_pretrained:
     def __init__(self, model_checkpoint):
         # load and define the model
         if 'esmc_300m' in model_checkpoint:
-            checkpoint_path = '/stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_300m_2024_12_v0.pth'
+            checkpoint_path = 'checkpoints/ESMC/esmc_300m_2024_12_v0.pth'
             self.model = self.ESMC_300M_202412(checkpoint_path)
 
         elif 'esmc_600m' in model_checkpoint:
-            checkpoint_path = '/stor/work/Wilke/wilkelab/pLMs_checkpoints/ESMC/esmc_600m_2024_12_v0.pth'
+            checkpoint_path = 'checkpoints/ESMC/esmc_600m_2024_12_v0.pth'
             self.model = self.ESMC_600M_202412(checkpoint_path)
         
         else:
