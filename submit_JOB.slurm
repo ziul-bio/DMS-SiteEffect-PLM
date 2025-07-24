@@ -28,10 +28,10 @@
 #SBATCH -J ESM2ne_MLM                      # Job name
 #SBATCH -e jobs/%x_%j_stderr.txt        # Name of stderr error file
 #SBATCH -o jobs/%x_%j_stdout.txt        # Name of stdout output file
-#SBATCH -p gpu-h100                     # Queue (partition) name
+#SBATCH -p gpu-a100-dev                     # Queue (partition) name
 #SBATCH --nodes=1                       # Total # of nodes (must be 1 for serial)
 #SBATCH --ntasks-per-node=2
-#SBATCH -t 48:00:00                     # Run time (hh:mm:ss)
+#SBATCH -t 1:00:00                     # Run time (hh:mm:ss)
 #SBATCH -A MCB24023                     # Project/Allocation name (req'd if you have more than 1)
 #-----------------------------------------------------------------------
 #SBATCH --mail-type=all         # Send email at begin and end of job
@@ -64,5 +64,4 @@ source venv2/bin/activate
 ########################### Loop in bash file ###########################
 # This will call a bash script that will run the commands above but in a loop from a bash fil
 #python src/training/train.py -o vicam_600m/CRVDBv29_maxLen2046_Full_lr1e6_RLRP
-#python src/training/train.py -o ViCAM_300M/CRVDBv29_maxLen2046_Full_lr5e4_RLRP_test
 srun python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP
