@@ -14,7 +14,7 @@ from pytorch_lightning.strategies import DDPStrategy
 from src.model.ESM2_MLM import Load_from_pretrained
 
 from src.data.dataset_esm2 import MyDataModule
-from src.model.model_config import config
+from src.model.esm2_config import config
 
 
 ################ pytorch lightning model ######################
@@ -113,12 +113,12 @@ def main(args):
         
     trainer = pl.Trainer(
         accelerator="gpu",
+        devices=1,                          # [0, 1] for 2 GPUs, or -1 for all available GPUs
         #strategy="ddp",
-        strategy='ddp_find_unused_parameters_true',
+        #strategy='ddp_find_unused_parameters_true',
         #strategy=DDPStrategy(find_unused_parameters=True),
-        devices=-1,                          # [0, 1] for 2 GPUs, or -1 for all available GPUs
         #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80) 
-	max_epochs= args.epochs,                 
+	    max_epochs= args.epochs,                 
         enable_checkpointing=True,
         gradient_clip_val=1.0,               # Clip gradients if they exceed 1.0
         logger=logger,
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen1022_20aa/')
     parser.add_argument('-o', '--output', type=str, default=None)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=40)
     parser.add_argument('--LRfinder', action='store_true')
     parser.add_argument('--resume', action='store_true')
@@ -172,5 +172,5 @@ if __name__ == '__main__':
 
 ###### RUNNING EXAMPLES ######  
 # python src/training/train_esm2.py -o esm2_vicam_650m/test_lr_finder --LRfinder
-# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr5e4_RLRP
+# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_test
 # python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr5e4_RLRP --resume --checkpoint_resume checkpoints/ViCAM_300m/CRVDBv29_maxLen1022_Full_lr5e4_RLRP/epoch=12-val_loss=1.20.ckpt

@@ -126,7 +126,7 @@ def main(args):
     trainer = pl.Trainer(
         accelerator="gpu",
         strategy="ddp",
-        devices=2, #[0, 1, 2, 3],            # [0, 1] for 2 GPUs, or -1 for all available GPUs
+        devices=1, #[0, 1, 2, 3],            # [0, 1] for 2 GPUs, or -1 for all available GPUs
         #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80)
         max_epochs= args.epochs,                 
         #val_check_interval=5000,

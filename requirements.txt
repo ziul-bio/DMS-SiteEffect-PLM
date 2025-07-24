@@ -4,3 +4,4 @@ plotnine
 pandas
 scikit-learn
 scipy
+tensorboard
