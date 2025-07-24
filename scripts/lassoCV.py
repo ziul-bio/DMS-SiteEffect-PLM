@@ -147,7 +147,11 @@ def run_regression_on_compressed_files(path_compressed_embed_file, path_meta_dat
         raise ValueError('Invalid file format. Please provide either a .pkl, .pt or a .csv file with the first column named ID')
 
 
-    data = meta_data.merge(embed_df, how='inner', left_on='ID', right_on='ID')
+    #data = meta_data.merge(embed_df, how='inner', left_on='ID', right_on='ID')
+    
+    # temporary version tot rsawhney
+    data = meta_data.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
+    
     target = data['target']
     features = data.iloc[:, meta_data.shape[1]:]
     features = features_scaler(features)

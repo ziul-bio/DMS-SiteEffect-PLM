@@ -83,7 +83,7 @@ import os
 import random
 from Bio import SeqIO
 
-def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1, seed=42):
+def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1, seed=42, seq_max_length=1022):
     """
     Splits a FASTA file into train, validation, and test sets.
      Args:
@@ -107,8 +107,8 @@ def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ra
 
     for record in records:
         sequence_str = str(record.seq).upper()
-        if len(sequence_str) > 2046:
-            print(f"Skipping sequence {record.id} with length {len(sequence_str)} > 2046.")
+        if len(sequence_str) > seq_max_length:
+            print(f"Skipping sequence {record.id} with length {len(sequence_str)} > {seq_max_length}.")
             longer_seq += 1
             continue
 
@@ -125,7 +125,7 @@ def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ra
 
     print(f"Total sequences: {len(records)}")
     print(f"Valid sequences: {len(valid_records)}")
-    print(f"{longer_seq} sequences were longer than 2048.")
+    print(f"{longer_seq} sequences were longer than {seq_max_length}.")
     print(f"Invalid characters found in {invalid_count} sequences.")
 
     # Split based on valid_records
@@ -146,7 +146,7 @@ def split_fasta(input_fasta, output_dir, train_ratio=0.8, val_ratio=0.1, test_ra
 
 
 if __name__ == "__main__":
+    seq_max_length = 1022 
     input_fasta = "data/raw/URVDBv29-prot_clustered.fasta"
-    output_dir = "data/processed/C-RVDBv29_maxlen2046_20aa"
-    split_fasta(input_fasta, output_dir, train_ratio=0.9, val_ratio=0.05, test_ratio=0.05)
- 
+    output_dir = f"data/processed/C-RVDBv29_maxlen{seq_max_length}_20aa"
+    split_fasta(input_fasta, output_dir, train_ratio=0.9, val_ratio=0.05, test_ratio=0.05, seq_max_length=seq_max_length)

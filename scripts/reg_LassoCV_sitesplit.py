@@ -150,8 +150,14 @@ def run_regression_on_compressed_files(path_compressed_embed_file, path_meta_dat
 
     for fold, seed in enumerate([374, 98, 20, 8477, 1234], start=1):
         train, test = split_data(meta_data, seed)
-        train_data = train.merge(embed_df, how='inner', left_on='ID', right_on='ID')
-        test_data = test.merge(embed_df, how='inner', left_on='ID', right_on='ID')
+        
+        #train_data = train.merge(embed_df, how='inner', left_on='ID', right_on='ID')
+        #test_data = test.merge(embed_df, how='inner', left_on='ID', right_on='ID')
+
+        # temporary version tot rsawhney
+        train_data = train.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
+        test_data = test.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
+        
         y_train = train_data['target']
         y_test = test_data['target']
 

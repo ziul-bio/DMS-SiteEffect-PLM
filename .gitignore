@@ -1,7 +1,8 @@
 venv/
+/data/
 checkpoints/
 logs/
 embeddings/
 experiments/
-
+obsolete/
 *.pyc
