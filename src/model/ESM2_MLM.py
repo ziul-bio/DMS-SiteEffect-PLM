@@ -47,6 +47,7 @@ class Load_from_pretrained:
         
     
     def get_model_details(self):
+        del self.model.contact_head
         return self.model, self.alphabet
 
 
