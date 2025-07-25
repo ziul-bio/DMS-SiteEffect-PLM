@@ -114,7 +114,7 @@ def main(args):
     trainer = pl.Trainer(
         accelerator="gpu",
         devices=1,                          # [0, 1] for 2 GPUs, or -1 for all available GPUs
-        #strategy="ddp",
+        strategy="ddp",
         #strategy='ddp_find_unused_parameters_true',
         #strategy=DDPStrategy(find_unused_parameters=True),
         #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80) 
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-i', '--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen1022_20aa/')
     parser.add_argument('-o', '--output', type=str, default=None)
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--epochs', type=int, default=40)
     parser.add_argument('--LRfinder', action='store_true')
     parser.add_argument('--resume', action='store_true')
