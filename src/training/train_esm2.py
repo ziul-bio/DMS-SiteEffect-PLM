@@ -174,4 +174,4 @@ if __name__ == '__main__':
 ###### RUNNING EXAMPLES ######  
 # python src/training/train_esm2.py -o esm2_vicam_650m/test_lr_finder --LRfinder
 # python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_test
-# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr5e4_RLRP --resume --checkpoint_resume checkpoints/ViCAM_300m/CRVDBv29_maxLen1022_Full_lr5e4_RLRP/epoch=12-val_loss=1.20.ckpt
+# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP --resume --checkpoint_resume checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP/epoch=5-val_loss=1.44.ckpt

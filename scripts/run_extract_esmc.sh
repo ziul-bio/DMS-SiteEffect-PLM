@@ -40,10 +40,6 @@ files=(
 # done
                 
 
-
-
-
-
 # # ESM C 300M
 # MODEL_checkpoint='esmc-300m'
 # version=''
@@ -56,15 +52,13 @@ files=(
 
 
 
+# # # ESM-2 3B
+# MODEL_checkpoint='rsawhney_esm2_3B'
+# version=''
 
-
-# # ESM-2 3B
-MODEL_checkpoint='rsawhney_esm2_3B'
-version=''
-
-echo "Extracting embedding using model: $MODEL_checkpoint"
-for file in "${files[@]}"
-do
-    echo "Extracting embedding for $file:"
-    CUDA_VISIBLE_DEVICE=3 python scripts/extract_esm2_3B_tuned.py -i "data/viral/mutante_sequences/${file}_muts.fasta" -o "embeddings/${MODEL_checkpoint}/viral/${file}_embeddings.pt"
-done
+# echo "Extracting embedding using model: $MODEL_checkpoint"
+# for file in "${files[@]}"
+# do
+#     echo "Extracting embedding for $file:"
+#     CUDA_VISIBLE_DEVICE=3 python scripts/extract_esm2_3B_tuned.py -i "data/viral/mutante_sequences/${file}_muts.fasta" -o "embeddings/${MODEL_checkpoint}/viral/${file}_embeddings.pt"
+# done
