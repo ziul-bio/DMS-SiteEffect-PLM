@@ -1,0 +1,48 @@
+
+
+```{r}
+library(tidyverse)
+
+```
+
+
+
+```{r}
+data <- read_csv('data/viral/metadata/SARS2_BA1_SPIKE_Dadonaite.csv')
+data
+```
+
+
+
+```{r}
+# Example data
+#data <- tibble(mutant = c("N310T", "A45*", "G12D"))
+
+# Function to split the mutation string
+split_mut_sit <- function(mutation) {
+  matches <- str_match(mutation, "([A-Za-z])(\\d+)(\\S)")
+  if (!is.na(matches[1,1])) {
+    return(matches[1, 2:4])
+  } else {
+    return(rep(NA, 3))
+  }
+}
+
+# Apply the function and bind the result
+data <- data %>%
+  mutate(res = map(mutant, split_mut_sit)) %>%
+  mutate(wt = map_chr(res, 1),
+         site = as.integer(map_chr(res, 2)),
+         mut = map_chr(res, 3)) %>%
+  select(-res)
+
+data
+```
+
+
+
+```{r}
+model <- lm(target ~ site, data = data)
+summary(model)
+```
+

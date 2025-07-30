@@ -1,0 +1,14 @@
+venv*/
+/data/processed/
+/data/raw/
+/data/nonviral/
+data/viral/metadata copy
+data/viral/mutant_sequences
+data/viral/mutant_sequences copy
+logs/
+embeddings/
+checkpoints/
+obsolete/
+experiments/
+
+*.pyc
