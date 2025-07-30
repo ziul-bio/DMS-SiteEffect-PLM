@@ -127,30 +127,16 @@ def run_regression_on_compressed_files(path_compressed_embed_file, path_meta_dat
     '''Run regression on compressed embeddings'''
     
     meta_data = pd.read_csv(path_meta_data)
-    results = pd.DataFrame()
-
     # load and merge the data with features
-    if path_compressed_embed_file.endswith('.pkl'):
-        embed = pd.read_pickle(path_compressed_embed_file)
-        embed_df = pd.DataFrame.from_dict(embed).T.reset_index()
-        embed_df.rename(columns={'index': 'ID'}, inplace=True)
-    
-    elif path_compressed_embed_file.endswith('.pt'):
-        embed = torch.load(path_compressed_embed_file, weights_only=True)
-        embed_df = pd.DataFrame.from_dict(embed).T.reset_index()
-        embed_df.rename(columns={'index': 'ID'}, inplace=True)
-        
-    elif path_compressed_embed_file.endswith('.csv'):
-        embed_df = pd.read_csv(path_compressed_embed_file)
-
-    else:
-        raise ValueError('Invalid file format. Please provide either a .pkl, .pt or a .csv file with the first column named ID')
+    embed = torch.load(path_compressed_embed_file, weights_only=True)
+    embed_df = pd.DataFrame.from_dict(embed).T.reset_index()
+    embed_df.rename(columns={'index': 'ID'}, inplace=True)
 
 
-    #data = meta_data.merge(embed_df, how='inner', left_on='ID', right_on='ID')
+    data = meta_data.merge(embed_df, how='inner', left_on='ID', right_on='ID')
     
     # temporary version tot rsawhney
-    data = meta_data.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
+    #data = meta_data.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
     
     target = data['target']
     features = data.iloc[:, meta_data.shape[1]:]
@@ -159,9 +145,8 @@ def run_regression_on_compressed_files(path_compressed_embed_file, path_meta_dat
     # run regression
     r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(features, target)
     res = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs)
-    results = pd.concat([results, res], axis=0)
 
-    return results
+    return res
 
 
 ############################# Run Predictions #############################
