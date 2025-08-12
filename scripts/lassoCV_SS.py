@@ -2,7 +2,7 @@
 
 ###################### To run this script ##################################
 
-# python scripts/reg_LassoCV_sitesplit.py -i embeddings/ViCAM/CRVDBv29_maxLen2046_Full_lr1e6/PA_FLU_Sun2015_embeddings.pt -m data/DMS_mut_metadata/PA_FLU_Sun2015_metadata.csv -o results/lassoCV_sitesplit/vicam_300M/PA_FLU_Sun2015.csv    
+# python scripts/lassoCV_SS.py -e embeddings/esm2_650m/nonviral/BLAT_ECOLX_Ranganathan2015.pt -m data/nonviral/metadata/BLAT_ECOLX_Ranganathan2015.csv -o experiments/lassoCV_SS/esm2_650m/nonviral/BLAT_ECOLX_Ranganathan2015.csv    
     
 
 ################ imports #####################
@@ -28,6 +28,15 @@ from sklearn.exceptions import ConvergenceWarning
 
 
 ###################### Define Functions #######################
+
+def features_scaler(features):
+    '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaled_features = scaler.fit_transform(features)
+    return pd.DataFrame(scaled_features)
+
+
+
 
 def split_data(df, seed, train_pct=0.8, test_pct=0.2):
     """
@@ -71,45 +80,95 @@ def split_data(df, seed, train_pct=0.8, test_pct=0.2):
 
     return train_df, test_df
 
-def features_scaler(features):
-    '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_features = scaler.fit_transform(features)
-    return pd.DataFrame(scaled_features)
 
 
 
-def run_regression(X_train, X_test, y_train, y_test):
+def data_prep(path_compressed_embed_file, path_meta_data):
+    '''Run regression on compressed embeddings'''
+    
+    meta_data = pd.read_csv(path_meta_data)
+    meta_data = meta_data.query("mutant != 'WT'")
+
+    # load and merge the data with features
+    embed = torch.load(path_compressed_embed_file, weights_only=True)
+    embed_df = pd.DataFrame.from_dict(embed).T.reset_index()
+    embed_df.rename(columns={'index': 'ID'}, inplace=True)
+
+    return  meta_data, embed_df
+
+
+
+def run_regression(meta_data, embed_df):
     '''this version computes y_pred for train and test sets'''
- 
-    model = LassoCV(max_iter=1000, tol=1e-2, n_jobs=-1)
-    model.fit(X_train, y_train)
+    # Initialize lists for storing results
+    folds, num_nonzero_coefs = [], []
+    r2s_train, maes_train, rmses_train = [], [], []
+    r2s_test, maes_test, rmses_test = [], [], []
+    rhos_train, rhos_test = [], []
 
-    # get the number of non-zero coefficients
-    coeficients = model.coef_
-    num_nonzero_coef = np.sum(coeficients != 0)
+    for fold, seed in enumerate([374, 98, 20, 8477, 1234], start=1):
+        train, test = split_data(meta_data, seed)
+        
+        train_data = train.merge(embed_df, how='inner', left_on='ID', right_on='ID')
+        test_data = test.merge(embed_df, how='inner', left_on='ID', right_on='ID')
 
-    # Make predictions
-    y_pred_train = pd.DataFrame(model.predict(X_train))
-    y_pred_test = pd.DataFrame(model.predict(X_test))
+        y_train = train_data['target']
+        y_test = test_data['target']
 
-    # Evaluate the model
-    r2_train = metrics.r2_score(y_train, y_pred_train)
-    mae_train = metrics.mean_absolute_error(y_train, y_pred_train)
-    mse_train = metrics.mean_squared_error(y_train, y_pred_train)
-    rmse_train = np.sqrt(mse_train)
-    rho_train, p_value_train = spearmanr(y_train, y_pred_train)
+        X_train = features_scaler(train_data.iloc[:, train.shape[1]:])
+        X_test = features_scaler(test_data.iloc[:, test.shape[1]:])
+        print(f'Xtrain shape: {X_train.shape}, Xtest shape: {X_test.shape}')
 
-    r2_test = metrics.r2_score(y_test, y_pred_test)
-    mae_test = metrics.mean_absolute_error(y_test, y_pred_test)
-    mse_test = metrics.mean_squared_error(y_test, y_pred_test)
-    rmse_test = np.sqrt(mse_test)
-    rho_test, p_value_test = spearmanr(y_test, y_pred_test)
+    
+        # Define and train the regression model
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=ConvergenceWarning)
+            model = LassoCV(max_iter=1000, tol=1e-2, n_jobs=-1)
+            model.fit(X_train, y_train)
 
-    return r2_train, mae_train, rmse_train, r2_test, mae_test, rmse_test, rho_train, rho_test, num_nonzero_coef
+            # get the number of non-zero coefficients
+            coeficients = model.coef_
+            num_nonzero_coef = np.sum(coeficients != 0)
+
+            # Make predictions
+            y_pred_train = pd.DataFrame(model.predict(X_train))
+            y_pred_test = pd.DataFrame(model.predict(X_test))
+
+            # Evaluate the model
+            r2_train = metrics.r2_score(y_train, y_pred_train)
+            mae_train = metrics.mean_absolute_error(y_train, y_pred_train)
+            mse_train = metrics.mean_squared_error(y_train, y_pred_train)
+            rmse_train = np.sqrt(mse_train)
+            rho_train, p_value_train = spearmanr(y_train, y_pred_train)
+
+            r2_test = metrics.r2_score(y_test, y_pred_test)
+            mae_test = metrics.mean_absolute_error(y_test, y_pred_test)
+            mse_test = metrics.mean_squared_error(y_test, y_pred_test)
+            rmse_test = np.sqrt(mse_test)
+            rho_test, p_value_test = spearmanr(y_test, y_pred_test)
+
+            # Append results
+            r2s_train.append(r2_train)
+            maes_train.append(mae_train)
+            rmses_train.append(rmse_train)
+
+            r2s_test.append(r2_test)
+            maes_test.append(mae_test)
+            rmses_test.append(rmse_test)
+
+            rhos_train.append(rho_train)
+            rhos_test.append(rho_test)
+
+            folds.append(fold)
+            num_nonzero_coefs.append(num_nonzero_coef)
+
+            # Return the collected results
+            print(f"Results:  fold {fold}, r2_train: {r2_train:.3f}, r2_test: {r2_test:.3f}, Num coefs: {num_nonzero_coef}")
+    print(f"Results:  r2_train: {np.mean(r2s_train):.2f}, r2_test: {np.mean(r2s_test):.2f}, Num coefs: {np.mean(num_nonzero_coefs):.2f}")
+    return r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs
 
 
-def save_results(folds, r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, num_nonzero_coefs):
+def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs):
     # Create dictionary for results
     res_dict = {
         "Fold": folds,
@@ -130,78 +189,19 @@ def save_results(folds, r2s_train, maes_train, rmses_train, r2s_test, maes_test,
 
 
 
-def run_regression_on_compressed_files(path_compressed_embed_file, path_meta_data):
-    '''Run regression on compressed embeddings'''
-    
-    meta_data = pd.read_csv(path_meta_data)
-    meta_data = meta_data.query("mutant != 'WT'")
-    results = pd.DataFrame()
-
-    # load and merge the data with features
-    embed = torch.load(path_compressed_embed_file, weights_only=True)
-    embed_df = pd.DataFrame.from_dict(embed).T.reset_index()
-    embed_df.rename(columns={'index': 'ID'}, inplace=True)
-
-    # Initialize lists for storing results
-    folds, num_nonzero_coefs = [], []
-    r2s_train, maes_train, rmses_train = [], [], []
-    r2s_test, maes_test, rmses_test = [], [], []
-    rhos_train, rhos_test = [], []
-
-    for fold, seed in enumerate([374, 98, 20, 8477, 1234], start=1):
-        train, test = split_data(meta_data, seed)
-        
-        train_data = train.merge(embed_df, how='inner', left_on='ID', right_on='ID')
-        test_data = test.merge(embed_df, how='inner', left_on='ID', right_on='ID')
-
-        # # temporary version tot rsawhney
-        # train_data = train.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
-        # test_data = test.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
-        
-        y_train = train_data['target']
-        y_test = test_data['target']
-
-        X_train = features_scaler(train_data.iloc[:, train.shape[1]:])
-        X_test = features_scaler(test_data.iloc[:, test.shape[1]:])
-    
-        # run regression
-        r2_train, mae_train, rmse_train, r2_test, mae_test, rmse_test, rho_train, rho_test, num_nonzero_coef = run_regression(X_train, X_test, y_train, y_test)
-
-        # Append results
-        r2s_train.append(r2_train)
-        maes_train.append(mae_train)
-        rmses_train.append(rmse_train)
-
-        r2s_test.append(r2_test)
-        maes_test.append(mae_test)
-        rmses_test.append(rmse_test)
-
-        rhos_train.append(rho_train)
-        rhos_test.append(rho_test)
-
-        folds.append(fold)
-        num_nonzero_coefs.append(num_nonzero_coef)
-
-        print(f"Results:  fold {fold}, r2_train: {r2_train:.3f}, r2_test: {r2_test:.3f}, Num coefs: {num_nonzero_coef}")
-    print(f"Results:  r2_train: {np.mean(r2s_train):.3f}, r2_test: {np.mean(r2s_test):.3f}, Num coefs: {np.mean(num_nonzero_coefs)}")
-    
-    res = save_results(folds, r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, num_nonzero_coefs)
-    results = pd.concat([results, res], axis=0)
-
-    return results
 
 
 ############################# Run Predictions #############################
 
 def main():
     parser = argparse.ArgumentParser(description="Run regression for different target datasets and layers")
-    parser.add_argument("-i", "--input", type=str, help="Path to the input file")
+    parser.add_argument("-e", "--embed", type=str, help="Path to the input file")
     parser.add_argument("-m", "--metadata", type=str, help="Target name in the metadata")
     parser.add_argument("-o", "--output", type=str, help="Path to the output file")
     args = parser.parse_args()
     
     # Define the target name and output file
-    path_compressed_embed_file = args.input
+    path_compressed_embed_file = args.embed
     path_meta_data = args.metadata
     output = args.output
 
@@ -210,7 +210,12 @@ def main():
         os.makedirs(output_dir)
    
     print("Starting regression...")
-    results = run_regression_on_compressed_files(path_compressed_embed_file, path_meta_data)
+    # prepare data
+    meta_data, embed_df = data_prep(path_compressed_embed_file, path_meta_data)
+
+    # run regression
+    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(meta_data, embed_df)
+    results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs)
     results.to_csv(output)
     print(f'Process Finished!')
 

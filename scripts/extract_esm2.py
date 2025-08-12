@@ -4,17 +4,13 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import argparse
-import pathlib
-
 import torch
+import pathlib
+import argparse
+from esm import FastaBatchedDataset, pretrained, MSATransformer
+#from esm import Alphabet, FastaBatchedDataset, ProteinBertModel, pretrained, MSATransformer
 
-from esm import Alphabet, FastaBatchedDataset, ProteinBertModel, pretrained, MSATransformer
 
-
-
-
-#python scripts/extract_esm2_viral.py esm2_t33_650M_UR50D data/viral/mutant_sequences/CVB3_2A_Alvarez.fasta embeddings/esm2_viral_650m/viral --repr_layers 33 --include mean --resume --tuned_checkpoint checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP/epoch=5-val_loss=1.44.ckpt
 
 
 def create_parser():
@@ -23,7 +19,7 @@ def create_parser():
     )
     parser.add_argument("--nogpu", action="store_true", help="Do not use GPU even if available")
     
-    parser.add_argument("--toks_per_batch", type=int, default=4096, help="maximum batch size")
+    parser.add_argument("--toks_per_batch", type=int, default=9000, help="maximum batch size")
     
     parser.add_argument(
         "model_location",
@@ -99,7 +95,7 @@ def run(args):
     )
     print(f"Read {args.fasta_file} with {len(dataset)} sequences")
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    #args.output_dir.mkdir(parents=True, exist_ok=True)
     return_contacts = "contacts" in args.include
 
     assert all(-(model.num_layers + 1) <= i <= model.num_layers for i in args.repr_layers)
@@ -125,8 +121,9 @@ def run(args):
                 contacts = out["contacts"].to(device="cpu")
 
             for i, label in enumerate(labels):
-                args.output_file = args.output_dir / f"{label}.pt"
-                args.output_file.parent.mkdir(parents=True, exist_ok=True)
+                #args.output_file = args.output_dir / f"{label}.pt"
+                #args.output_file.parent.mkdir(parents=True, exist_ok=True)
+                
                 result = {"label": label}
                 truncate_len = min(args.truncation_seq_length, len(strs[i]))
                 # Call clone on tensors to ensure tensors are not views into a larger representation
@@ -136,7 +133,6 @@ def run(args):
                         layer: t[i, 1 : truncate_len + 1].clone()
                         for layer, t in representations.items()
                     }
-                
                 if "mean" in args.include:
                     result["mean_representations"] = {
                         layer: t[i, 1 : truncate_len + 1].mean(0).clone()
@@ -156,7 +152,11 @@ def run(args):
                 #     result,
                 #     args.output_file,
                 # )
-    torch.save(mean_representation, f"{args.output_dir}.pt")
+    res_path = f"{args.output_dir}.pt"
+    print(f'Saving mean embeddings for {res_path}')
+    res_path = pathlib.Path(res_path)
+    res_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(mean_representation, res_path)
 
 
 def main():

@@ -2,7 +2,7 @@
 
 # Project and Venv paths (dynamically determined based on current directory)
 PROJECT_PATH="$(pwd)"
-VENV_PATH="$PROJECT_PATH/venv"
+VENV_PATH="$PROJECT_PATH/venv2"
 ACTIVATE_SCRIPT="$VENV_PATH/bin/activate"
 
 # Ensure virtual environment exists and create it if necessary
