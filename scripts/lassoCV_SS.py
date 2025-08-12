@@ -16,7 +16,7 @@ from scipy import stats
 from sklearn import metrics
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from scipy.stats import spearmanr
 import random
 
@@ -29,16 +29,16 @@ from sklearn.exceptions import ConvergenceWarning
 
 ###################### Define Functions #######################
 
-def features_scaler(features):
-    '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_features = scaler.fit_transform(features)
-    return pd.DataFrame(scaled_features)
+# def features_scaler(features):
+#     '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
+#     scaler = MinMaxScaler(feature_range=(0, 1))
+#     scaled_features = scaler.fit_transform(features)
+#     return pd.DataFrame(scaled_features)
 
 
 
 
-def split_data(df, seed, train_pct=0.8, test_pct=0.2):
+def split_data(meta_data, seed, train_pct=0.8, test_pct=0.2):
     """
     This function randomly splits a dataframe into train, test, and validation data given a seed by mutation site.
     
@@ -54,8 +54,8 @@ def split_data(df, seed, train_pct=0.8, test_pct=0.2):
      - val_df (DataFrame): the DataFrame containing randomly selected data by site to be used as the val dataset.
     """
     # find sites of mutation and order randomly
-    df["site"] = [int(s[1:-1]) for s in df["mutant"]]
-    sites = df["site"].unique()
+    meta_data["site"] = [int(s[1:-1]) for s in meta_data["mutant"]]
+    sites = meta_data["site"].unique()
     random.seed(seed)
     random.shuffle(sites)
 
@@ -63,20 +63,20 @@ def split_data(df, seed, train_pct=0.8, test_pct=0.2):
         print("Split percentages must sum to 1")
         return
 
-    df_size = df.shape[0]
+    df_size = meta_data.shape[0]
     df_test_size = df_size*test_pct
     test_sites, train_sites = [], []
 
     # determine sites for test, then train
     for site in sites:
         if len(test_sites) <= df_test_size:
-            test_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
+            test_sites.extend([mut_site for mut_site in meta_data["site"] if mut_site == site])
         else:
-            train_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
+            train_sites.extend([mut_site for mut_site in meta_data["site"] if mut_site == site])
 
     # subset df for train, test data
-    train_df = df[df["site"].isin(set(train_sites))]
-    test_df = df[df["site"].isin(set(test_sites))]
+    train_df = meta_data[meta_data["site"].isin(set(train_sites))]
+    test_df = meta_data[meta_data["site"].isin(set(test_sites))]
 
     return train_df, test_df
 
@@ -86,7 +86,9 @@ def split_data(df, seed, train_pct=0.8, test_pct=0.2):
 def data_prep(path_compressed_embed_file, path_meta_data):
     '''Run regression on compressed embeddings'''
     
+    scaler = StandardScaler()
     meta_data = pd.read_csv(path_meta_data)
+    meta_data['target'] = scaler.fit_transform(meta_data['target'].to_frame()).squeeze()
     meta_data = meta_data.query("mutant != 'WT'")
 
     # load and merge the data with features
@@ -115,15 +117,16 @@ def run_regression(meta_data, embed_df):
         y_train = train_data['target']
         y_test = test_data['target']
 
-        X_train = features_scaler(train_data.iloc[:, train.shape[1]:])
-        X_test = features_scaler(test_data.iloc[:, test.shape[1]:])
-        print(f'Xtrain shape: {X_train.shape}, Xtest shape: {X_test.shape}')
+        #X_train = features_scaler(train_data.iloc[:, train.shape[1]:])
+        #X_test = features_scaler(test_data.iloc[:, test.shape[1]:])
+        X_train = train_data.iloc[:, train.shape[1]:]
+        X_test = test_data.iloc[:, test.shape[1]:]
 
     
         # Define and train the regression model
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=ConvergenceWarning)
-            model = LassoCV(max_iter=1000, tol=1e-2, n_jobs=-1)
+            model = LassoCV(max_iter=10000, tol=1e-4, n_jobs=-1)
             model.fit(X_train, y_train)
 
             # get the number of non-zero coefficients

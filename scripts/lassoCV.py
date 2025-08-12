@@ -15,7 +15,7 @@ import pandas as pd
 from sklearn import metrics
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from scipy.stats import spearmanr
 
 # to ignore the convergence warnings and Rho computeation warnings. 
@@ -27,18 +27,21 @@ from sklearn.exceptions import ConvergenceWarning
 
 ###################### Define Functions #######################
 
-def features_scaler(features):
-    '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_features = scaler.fit_transform(features)
-    return pd.DataFrame(scaled_features)
+# def features_scaler(features):
+#     '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
+#     scaler = MinMaxScaler(feature_range=(0, 1))
+#     scaled_features = scaler.fit_transform(features)
+#     return pd.DataFrame(scaled_features)
 
 
 
 def data_prep(path_compressed_embed_file, path_meta_data):
     '''Run regression on compressed embeddings'''
     
+    scaler = StandardScaler()
     meta_data = pd.read_csv(path_meta_data)
+    meta_data['target'] = scaler.fit_transform(meta_data['target'].to_frame()).squeeze()
+    
     # load and merge the data with features
     embed = torch.load(path_compressed_embed_file, weights_only=True)
     embed_df = pd.DataFrame.from_dict(embed).T.reset_index()
@@ -51,7 +54,7 @@ def data_prep(path_compressed_embed_file, path_meta_data):
     
     target = data['target']
     features = data.iloc[:, meta_data.shape[1]:]
-    features = features_scaler(features)
+    #features = features_scaler(features)
     
     return features, target
 
@@ -72,7 +75,7 @@ def run_regression(features, target):
         # Define and train the regression model
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=ConvergenceWarning)
-            model = LassoCV(max_iter=1000, tol=1e-2, n_jobs=-1)
+            model = LassoCV(max_iter=10000, tol=1e-4, n_jobs=-1)
             model.fit(X_train, y_train)
 
             # get the number of non-zero coefficients
