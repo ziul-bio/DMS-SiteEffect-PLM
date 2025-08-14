@@ -3,10 +3,12 @@ set -e
 
 # usage
 #taskset -c 50-112 bash run_lassoCV.sh 
-
+########################################################################################################
+#                                      Viral sequences
+########################################################################################################
 
 viral=(
-    ####################### Debora marks datasets #######################
+   ####################### Debora marks datasets #######################
     # Singles
     IAV_NA_Jiang                  IAV_H1_HA_Wu                  IAV_H1_NP_Doud                   IAV_H5_HA_Dadonaite     
     IAV_H1_HA_Doud                IAV_PA_Wu                     IAV_PB2_Soh                      IAV_RDRP_Li
@@ -21,8 +23,7 @@ viral=(
     
     HIV1_BF520_ENV_Haddox         HIV1_BG505_ENV_Haddox         HIV1_HV1B9_ENV_DuenasDecamp      NIPAH_F_Larsen
     RmYN02_RBD_Starr              RsYN04_RBD_Starr              DENV_POLG_Suphatrakul            LAMBDA_HCP_Tsuboyama 
-    LASSA_GP_Carr                           
-    EV_CAPSD_Bakhache             EV_REP_Bakhache               BPP22_COAT_Tsuboyama          
+    LASSA_GP_Carr                 EV_CAPSD_Bakhache             EV_REP_Bakhache                  BPP22_COAT_Tsuboyama          
                                  
     ## Doubles and multiple      
     # PESV_POLG_Tsuboyama     BP434_RPC1_Tsuboyama
@@ -30,23 +31,62 @@ viral=(
     #AAV2_CAPSD_Sinai
     )
 
-for dts in "${viral[@]}"
-do
-    # echo "Running regression for dataset $dts, using ESM2-650M embeddings"                             
-    # python scripts/lassoCV.py -i "embeddings/esm2_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}_metadata.csv" -o "experiments/lassoCV/esm2_650m/viral/${dts}.csv"    
-    # python scripts/reg_LassoCV_sitesplit.py -i "embeddings/esm2_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV_SS/esm2_650m/viral/${dts}.csv"    
-    
-    echo "Running regression for dataset $dts, using ESM2 Viral 650M embeddings"                             
-    python scripts/lassoCV.py -i "embeddings/esm2_viral_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_viral_650m/viral/${dts}.csv"    
-    python scripts/reg_LassoCV_sitesplit.py -i "embeddings/esm2_viral_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV_SS/esm2_viral_650m/viral/${dts}.csv"    
-    
 
-    #echo "Running regression for dataset $dts, using rsawhney_esm2_3B embeddings"                             
-    #python scripts/lassoCV.py -i "embeddings/rsawhney_esm2_3B/${dts}_embeddings.pt" -m "data/viral/metadata/${dts}_metadata.csv" -o "experiments/lassoCV/rsawhney_esm2_3B/${dts}.csv"    
+########################################################################################################
+#                                      Non-Viral sequences
+########################################################################################################
+
+nonviral=(
+    ####################### Riesselman 2018, singles. #######################
+    'AMIE_PSEAE_Whitehead'            'DLG4_RAT_Ranganathan2012'            'RL401_YEAST_Bolon2014'
+    'B3VI55_LIPSTSTABLE'              'GAL4_YEAST_Shendure2015'             'RL401_YEAST_Fraser2016'
+    'B3VI55_LIPST_Whitehead2015'      'HSP82_YEAST_Bolon2016'               'SUMO1_HUMAN_Roth2017'
+    'BG_STRSQ_hmmerbit'               'IF1_ECOLI'                           'TIM_SULSO'
+    'BLAT_ECOLX_Ostermeier2014'       'KKA2_KLEPN_Mikkelsen2014'            'TIM_THEMA'
+    'BLAT_ECOLX_Palzkill2012'         'MK01_HUMAN_Johannessen'              'TIM_THETH'
+    'BLAT_ECOLX_Ranganathan2015'      'MTH3_HAEAESTABILIZED_Tawfik2015'     'TPK1_HUMAN_Roth2017'
+    'BLAT_ECOLX_Tenaillon2013'        'PABP_YEAST_Fields2013_singles'       'TPMT_HUMAN_Fowler2018'
+    'BRCA1_HUMAN_BRCT'                'PTEN_HUMAN_Fowler2018'               'UBC9_HUMAN_Roth2017'
+    'BRCA1_HUMAN_RING'                'RASH_HUMAN_Kuriyan'                  'UBE4B_MOUSE_Klevit2013_singles'
+    'CALM1_HUMAN_Roth2017'            'RL401_YEAST_Bolon2013'               'YAP1_HUMAN_Fields2012_singles'                         
+    )
+
+
+
+######################### Define variables ########################
+source="nonviral"
+datasets=("${nonviral[@]}")
+###################################################################
+
+
+for dts in "${datasets[@]}"
+do
+    # echo "Running regression K-fold Split for dataset $dts, using ESM2-650M embeddings"                             
+    # python scripts/lassoCV.py -i "embeddings/esm2_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_650m/viral/${dts}.csv"    
+    # echo " "                                  
+    # echo "Running regression Site Split for dataset $dts, using ESM2-650M embeddings"                             
+    # python scripts/lassoCV_SS.py -i "embeddings/esm2_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV_SS/esm2_650m/viral/${dts}.csv"    
+    # echo " "                                  
     
-    # echo "Running regression for dataset $dts, using ViCAM-300M embeddings"                             
-    # python scripts/lassoCV.py -i "embeddings/ViCAM/CRVDBv29_maxLen2046_20aa_Full_RLRP_lr1e6/${dts}_embeddings.pt" -m "data/viral/metadata/${dts}_metadata.csv" -o "experiments/lassoCV/vicam/CRVDBv29_maxLen2046_20aa_Full_RLRP_lr1e6/${dts}.csv"    
+    # echo "Running regression K-fold Split for dataset $dts, using ESM2 Viral 650M embeddings"                             
+    # python scripts/lassoCV.py -i "embeddings/esm2_viral_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_viral_650m/viral/${dts}.csv"    
+    # echo " "                                  
+    # echo "Running regression Site Split for dataset $dts, using ESM2 Viral 650M embeddings"                             
+    # python scripts/lassoCV_SS.py -i "embeddings/esm2_viral_650m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV_SS/esm2_viral_650m/viral/${dts}.csv"    
+    # echo " "                                  
     
+    # echo "Running regression K-fold Split for dataset $dts, using rsawhney_esm2_3B embeddings"                             
+    # python scripts/lassoCV.py -i "embeddings/rsawhney_esm2_3B/viral/${dts}.pt"  -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV/rsawhney_esm2_3B/viral/${dts}.csv"    
+    # echo " "                                  
+    # echo "Running regression Site Split for dataset $dts, using rsawhney_esm2_3B embeddings"                             
+    # python scripts/lassoCV_SS.py -i "embeddings/rsawhney_esm2_3B/viral/${dts}.pt"  -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV_SS/rsawhney_esm2_3B/viral/${dts}.csv"    
+    # echo " "                                  
+    
+    echo "Running regression K-fold Split for dataset $dts, using ESMC 600M embeddings"                             
+    python scripts/lassoCV.py -i "embeddings/esmc_600m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV/esmc_600m/viral/${dts}.csv"    
+    echo " "                                  
+    echo "Running regression Site Split for dataset $dts, using ESMC 600M embeddings"                             
+    python scripts/lassoCV_SS.py -i "embeddings/esmc_600m/viral/${dts}.pt" -m "data/viral/metadata/${dts}.csv" -o "experiments/lassoCV_SS/esmc_600m/viral/${dts}.csv"    
     echo " "                                  
 done
 
