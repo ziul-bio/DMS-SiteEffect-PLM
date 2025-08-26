@@ -73,7 +73,7 @@ def extract_mean_representations(model, tokenizer, fasta_file):
             tokens = tokenizer(batch_seqs, return_tensors="pt", padding=True)
             output = model(**tokens.to('cuda'), output_hidden_states=True)
 
-            embeddings = output['hidden_states'][0]
+            embeddings = output['hidden_states'][-1] # last layer
     
             # Extract the last hidden states for the sequence
             for i, ID in enumerate(batch_ids):
