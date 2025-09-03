@@ -126,7 +126,7 @@ def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_
         "RMSE_score_test": rmses_test,
         "rho_score_train": rhos_train,
         "rho_score_test": rhos_test,
-        "nun_zero_coefs": num_nonzero_coefs
+        "num_nonzero_coefs": num_nonzero_coefs
     }
 
     # Convert results to DataFrame
