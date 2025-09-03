@@ -1,7 +1,10 @@
+torch 
+torchvision
 biopython
 matplotlib
 plotnine
 pandas
 scikit-learn
 scipy
-tensorboard
+pytorch-lightning
+fair-esm

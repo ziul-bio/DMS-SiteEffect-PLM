@@ -15,13 +15,15 @@ torch.set_float32_matmul_precision('medium')
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.tuner.tuning import Tuner
 
 from scripts.ESM2ne_partial import LoadFromPretrained
 
 
 
-#python scripts/LitESM2ne_partial_trainer.py -i data/nonviral/metadata/BLAT_ECOLX_Ranganathan2015.csv -o experiments/fineTune/esm2_650m --checkpoint esm2_t33_650M_UR50D
-#python scripts/LitESM2ne_partial_trainer.py -i data/nonviral/metadata/BLAT_ECOLX_Ranganathan2015.csv -o experiments/fineTune/esm2_650m --checkpoint esm2_t33_650M_UR50D
+#python scripts/LitESM2ne_partial_trainer.py -i data/nonviral/metadata/BLAT_ECOLX_Ranganathan2015.csv -o experiments/fineTune/esm2_t33_650M_UR50D/nonviral/pool_split --checkpoint esm2_t33_650M_UR50D --seed 98
+#python scripts/LitESM2ne_partial_trainer.py -i data/viral/metadata/IAV_H1_HA_Wu.csv -o experiments/fineTune/esm2_t33_650M_UR50D/viral/pool_split --checkpoint esm2_t33_650M_UR50D --seed 98
+
 
 
 def parse_args():
@@ -32,8 +34,8 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
     parser.add_argument("--checkpoint", type=str, default="esm2_t6_8M_UR50D", help="Model checkpoint name or full path.")
     parser.add_argument("--num_classes", type=int, default=1, help="Number of classes (1 for regression).")
-    parser.add_argument("--epochs", type=int, default=40, help="Number of epochs.")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
+    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size.")
     parser.add_argument("--device", type=str, default=("cuda" if torch.cuda.is_available() else "cpu"), help="Device for training.")
     parser.add_argument("--learning_rate", type=float, default=5e-4, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay.")
@@ -114,6 +116,7 @@ class MyDataModule(pl.LightningDataModule):
         
     def setup(self, stage=None):
         data = pd.read_csv(args.data)
+        data = data.query("mutant != 'WT'")
 
         if self.split_strategy == 'site_split':
             train_df, val_df = split_data(data, seed=self.seed, train_pct=0.8, val_pct=0.2)
@@ -239,10 +242,14 @@ def main():
     model = LitModel(args)
     datamodule = MyDataModule(model.alphabet, args)
 
-    # if args.resume:
-    #     print(f"Resuming training from {args.checkpoint_resume}!")
-    #     trainer.fit(model, datamodule, ckpt_path=args.checkpoint_resume)
-    # else:
+    # print('Finding best learning rate:')
+    # tuner = Tuner(trainer)
+     
+    # # finds learning rate automatically
+    # # sets hparams.lr or hparams.learning_rate to that learning rate
+    # tuner.lr_find(model, datamodule, min_lr=1e-5, max_lr=1e-3, num_training=100)
+
+    # Train with the new LR
     trainer.fit(model, datamodule)
 
   

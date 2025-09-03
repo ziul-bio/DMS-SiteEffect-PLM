@@ -26,20 +26,13 @@ from sklearn.exceptions import ConvergenceWarning
 
 
 ###################### Define Functions #######################
-
-# def features_scaler(features):
-#     '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
-#     scaler = MinMaxScaler(feature_range=(0, 1))
-#     scaled_features = scaler.fit_transform(features)
-#     return pd.DataFrame(scaled_features)
-
-
-
 def data_prep(path_compressed_embed_file, path_meta_data):
     '''Run regression on compressed embeddings'''
     
     scaler = StandardScaler()
     meta_data = pd.read_csv(path_meta_data)
+    sample_size = meta_data.shape[0] 
+    protein_length = len(meta_data['sequence'][0])
     meta_data['target'] = scaler.fit_transform(meta_data['target'].to_frame()).squeeze()
     
     # load and merge the data with features
@@ -49,18 +42,15 @@ def data_prep(path_compressed_embed_file, path_meta_data):
 
     data = meta_data.merge(embed_df, how='inner', left_on='ID', right_on='ID')
     
-    # temporary version tot rsawhney
-    #data = meta_data.merge(embed_df, how='inner', left_on='mutant', right_on='ID').drop('ID_y', axis=1)
-    
     target = data['target']
     features = data.iloc[:, meta_data.shape[1]:]
-    #features = features_scaler(features)
+
     
-    return features, target
+    return features, target, sample_size, protein_length
 
 
 
-def run_regression(features, target):
+def run_regression(features, target, sample_size, protein_length):
     '''this version computes y_pred for train and test sets'''
     # Initialize lists for storing results
     folds, num_nonzero_coefs = [], []
@@ -68,7 +58,10 @@ def run_regression(features, target):
     r2s_test, maes_test, rmses_test = [], [], []
     rhos_train, rhos_test = [], []
 
-    for fold, seed in enumerate([374, 98, 20, 8477, 1234], start=1):
+    #for fold, seed in enumerate([98, 374, 1234], start=1):
+    for fold, rep in enumerate([1, 2, 3], start=1):
+        # seed is equal to sample size + protein length * rep
+        seed = (sample_size + protein_length) * rep
         
         X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=seed)
 
@@ -115,7 +108,7 @@ def run_regression(features, target):
             num_nonzero_coefs.append(num_nonzero_coef)
 
             # Return the collected results
-            print(f"Results:  fold {fold}, r2_train: {r2_train:.3f}, r2_test: {r2_test:.3f}, Num coefs: {num_nonzero_coef}")
+            print(f"Results:  fold {fold}, Seed: {seed}, r2_train: {r2_train:.3f}, r2_test: {r2_test:.3f}, Num coefs: {num_nonzero_coef}")
     print(f"Results:  r2_train: {np.mean(r2s_train):.2f}, r2_test: {np.mean(r2s_test):.2f}, Num coefs: {np.mean(num_nonzero_coefs):.2f}")
     return r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs
 
@@ -123,7 +116,7 @@ def run_regression(features, target):
 def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs):
     # Create dictionary for results
     res_dict = {
-        "Model": ['Lasso'] * 5,
+        "Model": ['Lasso'] * 3,
         "Fold": folds,
         "R2_score_train": r2s_train,
         "MAE_score_train": maes_train,
@@ -164,10 +157,10 @@ def main():
         os.makedirs(output_dir)
    
     # prepare data
-    features, target = data_prep(path_compressed_embed_file, path_meta_data)
+    features, target, sample_size, protein_length = data_prep(path_compressed_embed_file, path_meta_data)
 
     # run regression
-    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(features, target)
+    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(features, target, sample_size, protein_length)
     results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs)
     results.to_csv(output)
     print(f'Process Finished!')

@@ -3,6 +3,7 @@ import sys
 from ESMC_partial import Load_from_pretrained
 
 import argparse
+import numpy as np
 import pandas as pd
 import random
 
@@ -12,6 +13,7 @@ from torchmetrics.regression import R2Score
 from torch.utils.data import Dataset, DataLoader, random_split
 torch.set_float32_matmul_precision('medium')
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
@@ -53,9 +55,10 @@ class MyDataset(Dataset):
     This will be handled later in the collate_fn.
     """
     def __init__(self, data_file):
+        self.scaler = StandardScaler()
         self.data = data_file
-        self.sequences = [d['sequence'] for _, d in self.data.iterrows()]
-        self.targets = [d['target'] for _, d in self.data.iterrows()]
+        self.sequences = self.data['sequence'].tolist()
+        self.targets = self.scaler.fit_transform(self.data['target'].to_frame()).squeeze()
 
     def __len__(self):
         return len(self.targets)

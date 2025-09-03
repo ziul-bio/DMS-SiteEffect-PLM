@@ -160,7 +160,10 @@ class LoadFromPretrained:
             elif self.checkpoint == 'esm2_viral_650M':
                 self.model, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
                 del self.model.contact_head
+                # v01 with MLM MP of 15% (80, 10, 10)
                 model_checkpoint = '/stor/work/Wilke/luiz/ViCAM/checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP/epoch=9-val_loss=1.40.ckpt'
+                # v02 with MLM MP of 40% (100, 0, 0)
+                #model_checkpoint = '/stor/work/Wilke/luiz/ViCAM/checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP_MP40/epoch=23-val_loss=1.40.ckpt'
                 state_dict = torch.load(model_checkpoint, weights_only=True)['state_dict']
                 new_state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
                 self.model.load_state_dict(new_state_dict)
@@ -171,13 +174,22 @@ class LoadFromPretrained:
             raise ValueError(f"Model {self.checkpoint} not supported. Supported models are: {supported_models}")
         
         
+    # def setup_model_for_tune(self):
+    #     # freeze all layers but last one
+    #     print("Freezing all layers but the last...")
+    #     for param in self.model.parameters():
+    #         param.requires_grad = False
+    #     for param in self.model.layers[-1].parameters():
+    #         param.requires_grad = True
+
+
     def setup_model_for_tune(self):
-        # freeze all layers but last one
-        print("Freezing all layers but the last...")
-        for param in self.model.parameters():
-            param.requires_grad = False
-        for param in self.model.layers[-1].parameters():
-            param.requires_grad = True
+        print("Freezing all layers but the last two...")
+        num_layers = len(self.model.layers)
+        n_trainable = 2
+        trainable_blocks = [f"layers.{i}." for i in range(num_layers - n_trainable, num_layers)] 
+        for name, param in self.model.named_parameters():
+            param.requires_grad = any(block in name for block in trainable_blocks)
         
         # Change the lm head to match the number of classes, regression
         self.model_dimension = self.model.embed_dim

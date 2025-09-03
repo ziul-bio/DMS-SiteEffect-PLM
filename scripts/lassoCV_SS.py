@@ -108,7 +108,9 @@ def run_regression(meta_data, embed_df):
     r2s_test, maes_test, rmses_test = [], [], []
     rhos_train, rhos_test = [], []
 
-    for fold, seed in enumerate([374, 98, 20, 8477, 1234], start=1):
+    for fold, rep in enumerate([1, 2, 3], start=1):
+        # seed is equal to sample size + protein length * rep
+        seed = (meta_data.shape[0] + len(meta_data['sequence'][0])) * rep
         train, test = split_data(meta_data, seed)
         
         train_data = train.merge(embed_df, how='inner', left_on='ID', right_on='ID')
@@ -117,8 +119,6 @@ def run_regression(meta_data, embed_df):
         y_train = train_data['target']
         y_test = test_data['target']
 
-        #X_train = features_scaler(train_data.iloc[:, train.shape[1]:])
-        #X_test = features_scaler(test_data.iloc[:, test.shape[1]:])
         X_train = train_data.iloc[:, train.shape[1]:]
         X_test = test_data.iloc[:, test.shape[1]:]
 
@@ -166,7 +166,7 @@ def run_regression(meta_data, embed_df):
             num_nonzero_coefs.append(num_nonzero_coef)
 
             # Return the collected results
-            print(f"Results:  fold {fold}, r2_train: {r2_train:.3f}, r2_test: {r2_test:.3f}, Num coefs: {num_nonzero_coef}")
+            print(f"Results:  fold {fold}, Seed: {seed}, r2_train: {r2_train:.3f}, r2_test: {r2_test:.3f}, Num coefs: {num_nonzero_coef}")
     print(f"Results:  r2_train: {np.mean(r2s_train):.2f}, r2_test: {np.mean(r2s_test):.2f}, Num coefs: {np.mean(num_nonzero_coefs):.2f}")
     return r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs
 
@@ -212,7 +212,6 @@ def main():
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
-    print("Starting regression...")
     # prepare data
     meta_data, embed_df = data_prep(path_compressed_embed_file, path_meta_data)
 

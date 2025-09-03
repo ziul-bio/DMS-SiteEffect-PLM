@@ -7,8 +7,6 @@ from tqdm import tqdm
 from transformers import EsmForMaskedLM, AutoTokenizer
 from peft import PeftModel, PeftConfig
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
-
 
 # Usage:
 # python scripts/extract_esm2_3B_tuned.py -i data/DMS_mut_sequences/Delta_spike_latent_Dadonaite2023_muts.fasta -o embeddings/rsawhney_esm2_3B/Delta_spike_latent_Dadonaite2023_embeddings.pt
@@ -24,7 +22,7 @@ class FastaDataLoader:
     - batch_token_limit (int, optional): Maximum number of tokens per batch. Defaults to 4096.
     - model (object): Model object with a `_tokenize` method for tokenizing sequences.
     """
-    def __init__(self, fasta_file, batch_token_limit=16096):
+    def __init__(self, fasta_file, batch_token_limit=16000):
         self.fasta_file = fasta_file
         self.batch_token_limit = batch_token_limit
         self.sequences = list(SeqIO.parse(fasta_file, "fasta"))
@@ -80,8 +78,7 @@ def extract_mean_representations(model, tokenizer, fasta_file):
                 representations =  embeddings[i, 1:batch_lengths[i]+1, :].detach().to('cpu') 
                 # extract mean representation of the sequence
                 mean_representations[ID] = (representations.mean(dim=0))
-        
-    
+
     return mean_representations
 
 
@@ -89,6 +86,7 @@ def main():
     parser = argparse.ArgumentParser(description="Extracting ESMC representations from a FASTA file")
     parser.add_argument("-i", "--input_fasta", type=str, required=True, help="Path to the input FASTA file")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output file")
+    #parser.add_argument("--gpu", default=0)
     args = parser.parse_args()
 
     # Define the input parameters
