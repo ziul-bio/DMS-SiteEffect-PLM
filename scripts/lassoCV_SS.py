@@ -29,15 +29,6 @@ from sklearn.exceptions import ConvergenceWarning
 
 ###################### Define Functions #######################
 
-# def features_scaler(features):
-#     '''Scale the features by min-max scaler, to ensure that the features selected by Lasso are not biased by the scale of the features'''
-#     scaler = MinMaxScaler(feature_range=(0, 1))
-#     scaled_features = scaler.fit_transform(features)
-#     return pd.DataFrame(scaled_features)
-
-
-
-
 def split_data(meta_data, seed, train_pct=0.8, test_pct=0.2):
     """
     This function randomly splits a dataframe into train, test, and validation data given a seed by mutation site.

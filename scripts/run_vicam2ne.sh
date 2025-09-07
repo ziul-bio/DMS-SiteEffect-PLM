@@ -2,37 +2,81 @@
 set -e
 
 # usage
-#bash run_finetune.sh 
-#IAV_NA_Jiang not working
+#taskset -c 50-112 bash run_vicam2ne.sh 
+########################################################################################################
+#                                      Viral sequences
+#                                   Debora marks datasets 
+########################################################################################################
 viral=(
-    # BF520_env_Bloom2018                    H1N1_M1_RF_Wu2016        H3N2_HA_effect_Welsh2024                 OmiXBB15_spike_entry_Dadonaite2024
-    # BG505_env_Bloom2018                    H1N1_M2_maxRF_Wu2016     H3N2_NA_fitness_Lei2023                  OmiXBB15_spike_escape_Dadonaite2024
-    # CVB3_capsid_MFElog2_Mattenberger2021   H1N1_M2_RF_Wu2016        HG_FLU_Bloom2016                         PA_FLU_Sun2015
-    # CVB3_capsid_MFE_Mattenberger2021       H1N1_NEP_enri_Teo2024    HIV1_Rev_SelCoeff_Fernandes2016          
-    # DENV2_NS5_score_Suphatrakul2023        H1N1_NEP_RF_Teo2024      HIV1_Tat_SelCoeff_Fernandes2016          Zika_env_effect_Sourisseau2019
-    # H1N1_PA_ddg_Wu2015                     H1N1_M1_maxRF_Wu2016     OmiXBB15_spike_ACE2bind_Dadonaite2024    Zika_env_log2effect_Sourisseau2019
-    # Delta_spike_observed_Dadonaite2023     Delta_spike_latent_Dadonaite2023
-    # #POLG_HCVJF_Sun2014
-
-    # CVB3_POLG_Mattenberger  AAV2_CAPSD_Sinai             IAV_H3_HA_Lee         RmYN02_RBD_Starr
-    # CVB3_VP1_Alvarez        BP434_RPC1_Tsuboyama         IAV_H3_NP_Doud        RsYN04_RBD_Starr
-    # CVB3_VP3_Alvarez        DENV_POLG_Suphatrakul        IAV_H5_HA_Dadonaite   SARS2_BA1_SPIKE_Dadonaite
-    # CVB3_2A_Alvarez         EV_CAPSD_Bakhache            IAV_NA_Jiang          SARS2_DELTA_SPIKE_Dadonaite
-    # CVB3_2B_Alvarez         EV_REP_Bakhache              IAV_PA_Wu             SARS2_MRPO_Flynn
-    # CVB3_2C_Alvarez         HIV1_BF520_ENV_Haddox        IAV_PB2_Soh           SARS2_PLPRO_Wu_abundance
-    # CVB3_3A_Alvarez         HIV1_BG505_ENV_Haddox        IAV_RDRP_Li           SARS2_PLPRO_Wu_activity
-    # CVB3_3B_Alvarez         HIV1_HV1B9_ENV_DuenasDecamp  IAV_H1_NP_Doud        SARS2_PRD0038_RBD_Starr
-    # CVB3_3C_Alvarez         LASSA_GP_Carr                IAV_H1_HA_Doud        SARS2_RBD_Starr_binding
-    # CVB3_3D_Alvarez         NIPAH_F_Larsen               IAV_H1_HA_Wu          SARS2_RBD_Starr_expression
-    # BPP22_COAT_Tsuboyama    LAMBDA_HCP_Tsuboyama         PESV_POLG_Tsuboyama   SARS2_XBB15_RBD_Taylor   
-    CVB3_POLG_Mattenberger                                                        
+    # Singles
+    IAV_NA_Jiang                  IAV_H1_HA_Wu                  IAV_H1_NP_Doud                   IAV_H5_HA_Dadonaite     
+    IAV_H1_HA_Doud                IAV_PA_Wu                     IAV_PB2_Soh                      IAV_RDRP_Li
+    IAV_H3_NP_Doud                IAV_H3_HA_Lee
+    CVB3_2A_Alvarez               CVB3_2B_Alvarez               CVB3_2C_Alvarez                  CVB3_3A_Alvarez    
+    CVB3_3B_Alvarez               CVB3_3C_Alvarez               CVB3_3D_Alvarez                  CVB3_VP1_Alvarez
+    CVB3_VP3_Alvarez              CVB3_POLG_Mattenberger
+    
+    SARS2_PRD0038_RBD_Starr       SARS2_PLPRO_activity_Wu       SARS2_PLPRO_abundance_Wu         SARS2_MRPO_Flynn
+    SARS2_RBD_binding_Starr       SARS2_RBD_expression_Starr    SARS2_BA1_SPIKE_Dadonaite        SARS2_DELTA_SPIKE_Dadonaite   
+    SARS2_XBB15_RBD_Taylor                 
+    
+    HIV1_BF520_ENV_Haddox         HIV1_BG505_ENV_Haddox         HIV1_HV1B9_ENV_DuenasDecamp      NIPAH_F_Larsen
+    RmYN02_RBD_Starr              RsYN04_RBD_Starr              DENV_POLG_Suphatrakul            LAMBDA_HCP_Tsuboyama 
+    LASSA_GP_Carr                 EV_CAPSD_Bakhache             EV_REP_Bakhache                  BPP22_COAT_Tsuboyama          
+                                 
+    ## Doubles and multiple      
+    # PESV_POLG_Tsuboyama     BP434_RPC1_Tsuboyama
+    ## Multiple
+    #AAV2_CAPSD_Sinai
     )
 
-for dts in "${viral[@]}"
-do
-    echo "Fine-tuning vicam_300m on $dts:"                             
-    #CUDA_VISIBLE_DEVICES=3 python scripts/LitESMC_partial_trainer.py -i "data/viral_dms/${dts}_dms.csv" -o "experiments/fineTune/vicam_300m/" --checkpoint_path checkpoints/vicam_300m/CRVDBv29_maxLen2046_20aa_Full_RLRP_lr1e6/epoch=9-val_loss=1.52.ckpt
-    CUDA_VISIBLE_DEVICES=3 python scripts/LitESMC_partial_trainer.py -i "data/viral_dms/${dts}_dms.csv" -o "experiments/fineTune/vicam_300m/" --batch_size 32 --checkpoint_path checkpoints/vicam_300m/CRVDBv29_maxLen2046_20aa_Full_RLRP_lr1e6/epoch=9-val_loss=1.52.ckpt
-    echo " "                                  
-done
 
+########################################################################################################
+#                                      Non-Viral sequences
+#                                    Riesselman 2018, singles. 
+########################################################################################################
+nonviral=(
+    'AMIE_PSEAE_Whitehead'            'DLG4_RAT_Ranganathan2012'            'RL401_YEAST_Bolon2014'
+    'B3VI55_LIPSTSTABLE'              'GAL4_YEAST_Shendure2015'             'RL401_YEAST_Fraser2016'
+    'B3VI55_LIPST_Whitehead2015'      'HSP82_YEAST_Bolon2016'               'SUMO1_HUMAN_Roth2017'
+    'BG_STRSQ_hmmerbit'               'IF1_ECOLI'                           'TIM_SULSO'
+    'BLAT_ECOLX_Ostermeier2014'       'KKA2_KLEPN_Mikkelsen2014'            'TIM_THEMA'
+    'BLAT_ECOLX_Palzkill2012'         'MK01_HUMAN_Johannessen'              'TIM_THETH'
+    'BLAT_ECOLX_Ranganathan2015'      'MTH3_HAEAESTABILIZED_Tawfik2015'     'TPK1_HUMAN_Roth2017'
+    'BLAT_ECOLX_Tenaillon2013'        'PABP_YEAST_Fields2013_singles'       'TPMT_HUMAN_Fowler2018'
+    'BRCA1_HUMAN_BRCT'                'PTEN_HUMAN_Fowler2018'               'UBC9_HUMAN_Roth2017'
+    'BRCA1_HUMAN_RING'                'RASH_HUMAN_Kuriyan'                  'UBE4B_MOUSE_Klevit2013_singles'
+    'CALM1_HUMAN_Roth2017'            'RL401_YEAST_Bolon2013'               'YAP1_HUMAN_Fields2012_singles'                         
+    )
+
+
+
+######################### Define variables ########################
+checkpoint="esm2_t33_650M_UR50D"
+source="viral"
+datasets=("${nonviral[@]}")
+
+########################### Fixed arguments #######################
+strategies=('pool_split' 'site_split')
+seeds=(20 98 374 1234 8477)
+
+for dts in "${datasets[@]}"
+do
+    for strategy in "${strategies[@]}"
+    do
+        for sd in "${seeds[@]}"
+        do
+            echo "Fine-tuning ESM-2 650M on $dts with strategy $strategy and seed $sd"
+            
+            python scripts/LitESM2ne_partial_trainer.py \
+                -i "data/${source}/metadata/${dts}.csv" \
+                -o "experiments/fineTune/${checkpoint}/${source}/${strategy}/" \
+                --seed $sd \
+                --split_strategy $strategy \
+                --checkpoint "$checkpoint"
+
+            echo ""
+        done
+    done
+done
+###################################################################

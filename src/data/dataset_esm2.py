@@ -112,9 +112,9 @@ class MyDataModule(pl.LightningDataModule):
             mask_token=alphabet.mask_idx,
             no_mask_tokens=[alphabet.cls_idx, alphabet.eos_idx],
             n_tokens=len(alphabet.all_toks),
-            masking_prob=0.15,
-            randomize_prob=0.1,
-            no_change_prob=0.1
+            masking_prob=0.4,
+            randomize_prob=0,
+            no_change_prob=0
         )
     
 

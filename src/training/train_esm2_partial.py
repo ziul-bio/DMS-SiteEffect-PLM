@@ -1,17 +1,17 @@
 import torch
 import torch.nn as nn
 from torch.optim import AdamW 
-from torch.optim.lr_scheduler import SequentialLR, LinearLR, ConstantLR, CosineAnnealingLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, ReduceLROnPlateau
 torch.set_float32_matmul_precision('medium')
 
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger, CSVLogger
+from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.tuner.tuning import Tuner
 from pytorch_lightning.strategies import DDPStrategy
 
 #import esm
-from src.model.ESM2_MLM import Load_from_pretrained
+from src.model.ESM2_MLM_partial import Load_from_pretrained
 
 from src.data.dataset_esm2 import MyDataModule
 from src.model.esm2_config import config
@@ -30,12 +30,12 @@ class LitModel(pl.LightningModule):
         self.beta2 = config['beta2']
         
         # metrics and loss function
-        pad_token_id = self.alphabet.padding_idx
+        pad_token_id = self.alphabet.padding_idx                                                                              # type: ignore
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=pad_token_id)
 
    
     def forward(self, inputs):
-        output = self.model(inputs['input_ids'], return_contacts=False)
+        output = self.model(inputs['input_ids'], return_contacts=False)                                                       # type: ignore
         logits = output['logits']
         return logits
 
@@ -68,18 +68,32 @@ class LitModel(pl.LightningModule):
         return loss, perplexity
 
 
+    # def configure_optimizers(self):
+    #     Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
+    #     # v01 with learning rate 4e-4, and MLM 15% (80, 10, 10).
+    #     # LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0) # It decays exponentially, by 10% each time it's triggered.
+    #     # v02 with learning rate 4e-4, and MLM 40% (100, 0, 0).
+    #     LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.5, patience=0, cooldown=0) # It decays exponentially, by 50% each time it's triggered.
+
+    #     return {
+    #         "optimizer": Optimizer,
+    #         "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss", "interval": "epoch", "frequency": 1}
+    #         }
+    
     def configure_optimizers(self):
-        Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
-        # v01 with learning rate 4e-4, and MLM 15% (80, 10, 10).
-        # LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0) # It decays exponentially, by 10% each time it's triggered.
-        # v02 with learning rate 4e-4, and MLM 40% (100, 0, 0).
-        LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.5, patience=0, cooldown=0) # It decays exponentially, by 50% each time it's triggered.
-
+        optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
+        warmup = LinearLR(optimizer, start_factor=0.1, total_iters=1)
+        cosine = CosineAnnealingLR(optimizer, T_max=4, eta_min=self.learning_rate * 0.1)
+        scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[1])  # switch after milestone epochs
+        
         return {
-            "optimizer": Optimizer,
-            "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss", "interval": "epoch", "frequency": 1}
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "frequency": 1
             }
-
+        }
 
 def main(args):
 
@@ -91,11 +105,6 @@ def main(args):
  
 
     ########################### Training setup ##########################
-    # logger = TensorBoardLogger(
-    #         save_dir='logs/',
-    #         name=args.output,
-    #         version=''
-    #         )
     logger = CSVLogger(
             save_dir='logs/',
             name=args.output,
@@ -107,7 +116,7 @@ def main(args):
         filename="{epoch}-{val_loss:.2f}",  
         save_on_train_epoch_end=True,
         monitor="val_loss",               
-        save_top_k=5,                      
+        save_top_k=10,                      
         mode="min",                             # Mode for monitoring (min for loss, max for accuracy, etc.)
     )
     
@@ -115,13 +124,13 @@ def main(args):
         monitor='val_loss',
         patience=5,                            # I am looking for 5 epochs, so patience=5*number of checks per epoch
         mode='min',
-        min_delta=0.001,
+        min_delta=0.01,
     )
         
     trainer = pl.Trainer(
         accelerator="gpu",
         num_nodes=1,
-        devices=1,                               # [0, 1] for 2 GPUs, or -1 for all available GPUs
+        devices=[1],                               # [0, 1] for 2 GPUs, or -1 for all available GPUs
         #strategy="ddp",
         #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80) 
 	    max_epochs= args.epochs,                 
@@ -130,24 +139,15 @@ def main(args):
         logger=logger,
         callbacks=[early_stopping_callback, checkpoint_callback],
     )
-    
-    ##################### Finding learning rate #####################
-    if args.LRfinder:
-        tuner = Tuner(trainer)
-        lr_finder = tuner.lr_find(model, datamodule, min_lr=1e-10, max_lr=1e-2, num_training=100)
-        fig = lr_finder.plot(suggest=True)                                                                     # type: ignore
-        lr_suggestion = round(lr_finder.suggestion(), 10)                                                      # type: ignore
-        print(f"Suggested learning rate: {lr_suggestion}")
-        fig.savefig(f"logs/{config['output']}/LRfind_{lr_suggestion}.png")                                     # type: ignore
+  
 
-    
     ########################### Training ##########################    
     if args.resume:
         print(f"Resuming training from {args.checkpoint_resume}!")
         trainer.fit(model, datamodule, ckpt_path=args.checkpoint_resume)
         trainer.test(model, datamodule=datamodule)
 
-    elif not args.LRfinder:
+    else:
         print("Training from scratch!")
         trainer.fit(model, datamodule)
         trainer.test(model, datamodule=datamodule)
@@ -159,9 +159,8 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-i', '--dataDir', type=str, default='data/processed/URVDBv30prot_rmdup_maxlen1600_20aa')
     parser.add_argument('-o', '--output', type=str, default=None)
-    parser.add_argument('--batch_size', type=int, default=4)
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--LRfinder', action='store_true')
+    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--checkpoint_resume', type=str)
     args = parser.parse_args()
@@ -170,6 +169,7 @@ if __name__ == '__main__':
 
 
 ###### RUNNING EXAMPLES ######  
-# python src/training/train_esm2.py -o esm2_vicam_650m/test_lr_finder --LRfinder
 # python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_test
 # python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP --resume --checkpoint_resume checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP/epoch=5-val_loss=1.44.ckpt
+
+# python src/training/train_esm2_partial.py -o esm2_viral_650m/URVDBv30_partial

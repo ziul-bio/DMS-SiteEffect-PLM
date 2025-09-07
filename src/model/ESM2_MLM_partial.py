@@ -10,6 +10,7 @@ class Load_from_pretrained:
         self.checkpoint_path = checkpoint_path
         self.model, self.alphabet = None, None
         self._load_model()
+        self.setup_model_for_tune()
 
     def _load_model(self):
         """Load one one the pre-trained ESM-2 models, add the classification head"""
@@ -46,10 +47,18 @@ class Load_from_pretrained:
         elif self.checkpoint_path not in supported_models:
             raise ValueError(f"Model {model_name} not supported. Supported models are: {supported_models}")
         
+    
+    def setup_model_for_tune(self):
+        num_layers = len(self.model.layers)                                                                                          # type: ignore
+        n_trainable = 3
+        print(f"Freezing all layers but the last {n_trainable}...")
+        trainable_blocks = [f"layers.{i}." for i in range(num_layers - n_trainable, num_layers)] 
+        for name, param in self.model.named_parameters():                                                                            # type: ignore
+            param.requires_grad = any(block in name for block in trainable_blocks)
 
 
     def get_model_details(self):
-        del self.model.contact_head
+        del self.model.contact_head                                                                                                 # type: ignore
         return self.model, self.alphabet
 
 

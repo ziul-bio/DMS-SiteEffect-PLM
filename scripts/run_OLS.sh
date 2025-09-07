@@ -2,7 +2,7 @@
 set -e
 
 # usage
-#taskset -c 50-112 bash run_lassoCV.sh 
+#taskset -c 0-16 bash scripts/run_OLS.sh 
 ########################################################################################################
 #                                      Viral sequences
 ########################################################################################################
@@ -33,11 +33,31 @@ viral=(
     )
 
 
+
+# ####################################### Define variables ###############################################
+# source="viral"
+# datasets=("${viral[@]}")
+# ########################################################################################################
+
+
+# for dts in "${datasets[@]}"
+# do
+#     echo "Running OLS regression Random Split for dataset $dts"                             
+#     python scripts/OLS.py -m "data/${source}/metadata/${dts}.csv" -o "experiments/OLS/${source}/pool_split/${dts}.csv"    
+#     echo " "                                  
+#     # echo "Running OLS regression Site Split for dataset $dts"                             
+#     # python scripts/OLS_SS.py -m "data/${source}/metadata/${dts}.csv" -o "experiments/OLS/${source}/site_split/${dts}.csv"    
+#     # echo " "                                                                  
+# done
+
+
+
+
 ########################################################################################################
 #                                      Non-Viral sequences
 ########################################################################################################
 
-cellular=(
+nonviral=(
     ####################### Riesselman 2018, singles. #######################
     'AMIE_PSEAE_Whitehead'            'DLG4_RAT_Ranganathan2012'            'RL401_YEAST_Bolon2014'
     'B3VI55_LIPSTSTABLE'              'GAL4_YEAST_Shendure2015'             'RL401_YEAST_Fraser2016'
@@ -58,39 +78,18 @@ cellular=(
 
 
 ####################################### Define variables ###############################################
-source="cellular"
-datasets=("${cellular[@]}")
+source="nonviral"
+datasets=("${nonviral[@]}")
 ########################################################################################################
 
 
 for dts in "${datasets[@]}"
 do
-    echo "Running regression Random Split for dataset $dts, using ESM2-650M embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/esm2_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_650m/${source}/pool_split/${dts}.csv"    
+    echo "Running OLS regression Random Split for dataset $dts"                             
+    python scripts/OLS.py -m "data/${source}/metadata/${dts}.csv" -o "experiments/OLS/${source}/pool_split/${dts}.csv"    
     echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using ESM2-650M embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/esm2_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_650m/${source}/site_split/${dts}.csv"    
-    echo " "                                  
-    
-    echo "Running regression Random Split for dataset $dts, using ESM2 Viral 650M embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/esm2_viral_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_viral_650m/${source}/pool_split/${dts}.csv"    
-    echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using ESM2 Viral 650M embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/esm2_viral_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_viral_650m/${source}/site_split/${dts}.csv"    
-    echo " "                                  
-    
-    echo "Running regression Random Split for dataset $dts, using rsawhney_esm2_3B embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/rsawhney_esm2_3B/${source}/${dts}.pt"  -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/rsawhney_esm2_3B/${source}/pool_split/${dts}.csv"    
-    echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using rsawhney_esm2_3B embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/rsawhney_esm2_3B/${source}/${dts}.pt"  -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/rsawhney_esm2_3B/${source}/site_split/${dts}.csv"    
-    echo " "                                  
-    
-    echo "Running regression Random Split for dataset $dts, using ESMC 600M embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/esmc_600m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esmc_600m/${source}/pool_split/${dts}.csv"    
-    echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using ESMC 600M embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/esmc_600m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esmc_600m/${source}/site_split/${dts}.csv"    
-    echo " "                                  
+#     echo "Running OLS regression Site Split for dataset $dts"                             
+#     python scripts/OLS_SS.py -m "data/${source}/metadata/${dts}.csv" -o "experiments/OLS/${source}/site_split/${dts}.csv"    
+#     echo " "                                                                  
 done
 
