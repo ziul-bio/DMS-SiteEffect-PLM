@@ -7,7 +7,6 @@ torch.set_float32_matmul_precision('medium')
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.tuner.tuning import Tuner
 from pytorch_lightning.strategies import DDPStrategy
 
 #import esm
@@ -30,12 +29,12 @@ class LitModel(pl.LightningModule):
         self.beta2 = config['beta2']
         
         # metrics and loss function
-        pad_token_id = self.alphabet.padding_idx                                                                              # type: ignore
+        pad_token_id = self.alphabet.padding_idx
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=pad_token_id)
 
    
     def forward(self, inputs):
-        output = self.model(inputs['input_ids'], return_contacts=False)                                                       # type: ignore
+        output = self.model(inputs['input_ids'], return_contacts=False)
         logits = output['logits']
         return logits
 
@@ -81,16 +80,18 @@ class LitModel(pl.LightningModule):
     #         }
     
     def configure_optimizers(self):
+        #steps_per_epoch = 41260 #3GPUs
+        steps_per_epoch = 20630 #6GPUs
         optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
-        warmup = LinearLR(optimizer, start_factor=0.1, total_iters=1)
-        cosine = CosineAnnealingLR(optimizer, T_max=4, eta_min=self.learning_rate * 0.1)
-        scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[1])  # switch after milestone epochs
+        warmup = LinearLR(optimizer, start_factor=0.1, total_iters=steps_per_epoch)
+        cosine = CosineAnnealingLR(optimizer, T_max=5*steps_per_epoch, eta_min=self.learning_rate*0.1)
+        scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[steps_per_epoch])  # milestone is when to switch from warm up to cosine.
         
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "interval": "epoch",
+                "interval": "step",
                 "frequency": 1
             }
         }
@@ -128,11 +129,11 @@ def main(args):
     )
         
     trainer = pl.Trainer(
-        accelerator="gpu",
         num_nodes=1,
-        devices=[1],                               # [0, 1] for 2 GPUs, or -1 for all available GPUs
-        #strategy="ddp",
-        #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80) 
+        devices=[1],                             # [0, 1] for 2 GPUs, or -1 for all available GPUs
+        accelerator="gpu",
+        #strategy='ddp',
+        strategy=DDPStrategy(process_group_backend="nccl"),
 	    max_epochs= args.epochs,                 
         enable_checkpointing=True,
         gradient_clip_val=1.0,                   # Clip gradients if they exceed 1.0
@@ -145,23 +146,29 @@ def main(args):
     if args.resume:
         print(f"Resuming training from {args.checkpoint_resume}!")
         trainer.fit(model, datamodule, ckpt_path=args.checkpoint_resume)
-        trainer.test(model, datamodule=datamodule)
 
+    if args.test:
+        print(f"Testing model: {args.checkpoint_resume}!")
+        trainer.test(model, datamodule=datamodule, ckpt_path=args.checkpoint_resume)
+    
     else:
         print("Training from scratch!")
         trainer.fit(model, datamodule)
-        trainer.test(model, datamodule=datamodule)
+
+     
 
     
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
+    #parser.add_argument('-i', '--dataDir', type=str, default='data/processed/example/')
     parser.add_argument('-i', '--dataDir', type=str, default='data/processed/URVDBv30prot_rmdup_maxlen1600_20aa')
     parser.add_argument('-o', '--output', type=str, default=None)
-    parser.add_argument('--batch_size', type=int, default=16)
-    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--batch_size', type=int, default=21)
+    parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--test', action='store_true')
     parser.add_argument('--checkpoint_resume', type=str)
     args = parser.parse_args()
     main(args)
@@ -169,7 +176,6 @@ if __name__ == '__main__':
 
 
 ###### RUNNING EXAMPLES ######  
-# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_test
-# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP --resume --checkpoint_resume checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP/epoch=5-val_loss=1.44.ckpt
-
+# python src/training/train_esm2_partial.py -o test/
 # python src/training/train_esm2_partial.py -o esm2_viral_650m/URVDBv30_partial
+# python src/training/train_esm2_partial.py -o esm2_vicam_650m/URVDBv30_partial --resume --checkpoint_resume checkpoints/esm2_viral_650m/URVDBv30_partial/epoch=0-val_loss=0.80.ckpt
