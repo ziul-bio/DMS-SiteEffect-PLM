@@ -14,9 +14,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from sklearn import metrics
-from sklearn.linear_model import Lasso, LassoCV
-from sklearn.model_selection import KFold
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.linear_model import LassoCV
+from sklearn.preprocessing import StandardScaler
 from scipy.stats import spearmanr
 import random
 
@@ -199,14 +198,14 @@ def main():
     path_meta_data = args.metadata
     output = args.output
 
-    output_dir = os.path.dirname(output)  # Get the directory path
+    output_dir = os.path.dirname(output)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
-    # prepare data
+    print('Loading data!')
     meta_data, embed_df = data_prep(path_compressed_embed_file, path_meta_data)
 
-    # run regression
+    print('Fitting the model!')
     r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(meta_data, embed_df)
     results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs)
     results.to_csv(output)

@@ -13,9 +13,9 @@ import argparse
 import numpy as np
 import pandas as pd
 from sklearn import metrics
-from sklearn.linear_model import Lasso, LassoCV
+from sklearn.linear_model import LassoCV
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import StandardScaler
 from scipy.stats import spearmanr
 
 # to ignore the convergence warnings and Rho computeation warnings. 
@@ -27,8 +27,6 @@ from sklearn.exceptions import ConvergenceWarning
 
 ###################### Define Functions #######################
 def data_prep(path_compressed_embed_file, path_meta_data):
-    '''Run regression on compressed embeddings'''
-    
     scaler = StandardScaler()
     meta_data = pd.read_csv(path_meta_data)
     sample_size = meta_data.shape[0] 
@@ -51,14 +49,12 @@ def data_prep(path_compressed_embed_file, path_meta_data):
 
 
 def run_regression(features, target, sample_size, protein_length):
-    '''this version computes y_pred for train and test sets'''
     # Initialize lists for storing results
     folds, num_nonzero_coefs = [], []
     r2s_train, maes_train, rmses_train = [], [], []
     r2s_test, maes_test, rmses_test = [], [], []
     rhos_train, rhos_test = [], []
 
-    #for fold, seed in enumerate([98, 374, 1234], start=1):
     for fold, rep in enumerate([1, 2, 3], start=1):
         # seed is equal to sample size + protein length * rep
         seed = (sample_size + protein_length) * rep
@@ -114,7 +110,6 @@ def run_regression(features, target, sample_size, protein_length):
 
 
 def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs):
-    # Create dictionary for results
     res_dict = {
         "Model": ['Lasso'] * 3,
         "Fold": folds,
@@ -128,8 +123,6 @@ def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_
         "rho_score_test": rhos_test,
         "num_nonzero_coefs": num_nonzero_coefs
     }
-
-    # Convert results to DataFrame
     results = pd.DataFrame(res_dict).reset_index(drop=True)
     return results
 
@@ -139,7 +132,6 @@ def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_
 
 
 ############################# Run Predictions #############################
-
 def main():
     parser = argparse.ArgumentParser(description="Run regression for different target datasets and layers")
     parser.add_argument("-e", "--embed", type=str, help="Path to the input file")
@@ -152,14 +144,14 @@ def main():
     path_meta_data = args.metadata
     output = args.output
 
-    output_dir = os.path.dirname(output)  # Get the directory path
+    output_dir = os.path.dirname(output)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
-    # prepare data
+    print('Loading data!')
     features, target, sample_size, protein_length = data_prep(path_compressed_embed_file, path_meta_data)
 
-    # run regression
+    print('Fitting the model!')
     r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(features, target, sample_size, protein_length)
     results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs)
     results.to_csv(output)
