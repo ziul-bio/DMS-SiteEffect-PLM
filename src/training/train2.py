@@ -80,6 +80,17 @@ class LitModel(pl.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
         
 
+    # def configure_optimizers(self):
+    #     Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
+    #     # v01 with learning rate 4e-4, and MLM 15% (80, 10, 10).
+    #     # LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0) # It decays exponentially, by 10% each time it's triggered.
+    #     # v02 with learning rate 4e-4, and MLM 40% (100, 0, 0).
+    #     LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.5, patience=0, cooldown=0) # It decays exponentially, by 50% each time it's triggered.
+
+    #     return {
+    #         "optimizer": Optimizer,
+    #         "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss", "interval": "epoch", "frequency": 1}
+    #         }
 
 
 def main(args):

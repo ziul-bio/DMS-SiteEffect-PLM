@@ -2,7 +2,7 @@
 
 ###################### To run this script ##################################
 
-# python scripts/OLS.py -m data/nonviral/metadata/BLAT_ECOLX_Ranganathan2015.csv -o experiments/OLS/nonviral/pool_split/BLAT_ECOLX_Ranganathan2015.csv   
+# python scripts/AVG_model.py -m data/cellular/metadata/BLAT_ECOLX_Ranganathan2015.csv -o experiments/AVG/cellular/pool_split/BLAT_ECOLX_Ranganathan2015.csv     
     
 
 ################ imports #####################

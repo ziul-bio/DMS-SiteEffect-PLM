@@ -54,7 +54,7 @@ def run_regression(data, sample_size, protein_length):
         
         train_data, test_data = train_test_split(data, test_size=0.2, random_state=seed)
 
-        # Fit the Average model, this will compute the average effect by site, and if the site does not exist, it applies the overall average.
+        # Fit the Average model, this will compute the average effect by site, and if the site does not exist, it apply the overall average.
         model = train_data.groupby(['site'])['target'].mean().to_dict()
         model['0'] = train_data['target'].mean().item()
 

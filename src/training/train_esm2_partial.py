@@ -16,6 +16,12 @@ from src.data.dataset_esm2 import MyDataModule
 from src.model.esm2_config import config
 
 
+###### RUNNING EXAMPLES ######  
+# python src/training/train_esm2_partial.py -o test/
+# python src/training/train_esm2_partial.py -o esm2_viral_650m/URVDBv30_partial
+# python src/training/train_esm2_partial.py -o esm2_vicam_650m/URVDBv30_partial --resume --checkpoint_resume checkpoints/esm2_viral_650m/URVDBv30_partial/epoch=0-val_loss=0.80.ckpt
+
+
 ################ pytorch lightning model ######################
 class LitModel(pl.LightningModule):
     def __init__(self):
@@ -66,18 +72,6 @@ class LitModel(pl.LightningModule):
         self.log("test_perplexity", perplexity, prog_bar=True, logger=True, sync_dist=True)
         return loss, perplexity
 
-
-    # def configure_optimizers(self):
-    #     Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
-    #     # v01 with learning rate 4e-4, and MLM 15% (80, 10, 10).
-    #     # LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0) # It decays exponentially, by 10% each time it's triggered.
-    #     # v02 with learning rate 4e-4, and MLM 40% (100, 0, 0).
-    #     LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.5, patience=0, cooldown=0) # It decays exponentially, by 50% each time it's triggered.
-
-    #     return {
-    #         "optimizer": Optimizer,
-    #         "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss", "interval": "epoch", "frequency": 1}
-    #         }
     
     def configure_optimizers(self):
         #steps_per_epoch = 41260 #3GPUs
@@ -85,7 +79,7 @@ class LitModel(pl.LightningModule):
         optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
         warmup = LinearLR(optimizer, start_factor=0.1, total_iters=steps_per_epoch)
         cosine = CosineAnnealingLR(optimizer, T_max=5*steps_per_epoch, eta_min=self.learning_rate*0.1)
-        scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[steps_per_epoch])  # milestone is when to switch from warm up to cosine.
+        scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[steps_per_epoch])  # milestone is when to switch from warm up to decay.
         
         return {
             "optimizer": optimizer,
@@ -123,7 +117,7 @@ def main(args):
     
     early_stopping_callback = EarlyStopping(
         monitor='val_loss',
-        patience=5,                            # I am looking for 5 epochs, so patience=5*number of checks per epoch
+        patience=5,                            
         mode='min',
         min_delta=0.01,
     )
@@ -132,11 +126,10 @@ def main(args):
         num_nodes=1,
         devices=[1],                             # [0, 1] for 2 GPUs, or -1 for all available GPUs
         accelerator="gpu",
-        #strategy='ddp',
         strategy=DDPStrategy(process_group_backend="nccl"),
 	    max_epochs= args.epochs,                 
         enable_checkpointing=True,
-        gradient_clip_val=1.0,                   # Clip gradients if they exceed 1.0
+        gradient_clip_val=1.0,                   # Clip gradients if they exceed 1.0, default L2 norm of gradients vector
         logger=logger,
         callbacks=[early_stopping_callback, checkpoint_callback],
     )
@@ -165,17 +158,10 @@ if __name__ == '__main__':
     #parser.add_argument('-i', '--dataDir', type=str, default='data/processed/example/')
     parser.add_argument('-i', '--dataDir', type=str, default='data/processed/URVDBv30prot_rmdup_maxlen1600_20aa')
     parser.add_argument('-o', '--output', type=str, default=None)
-    parser.add_argument('--batch_size', type=int, default=21)
-    parser.add_argument('--epochs', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--checkpoint_resume', type=str)
     args = parser.parse_args()
     main(args)
-
-
-
-###### RUNNING EXAMPLES ######  
-# python src/training/train_esm2_partial.py -o test/
-# python src/training/train_esm2_partial.py -o esm2_viral_650m/URVDBv30_partial
-# python src/training/train_esm2_partial.py -o esm2_vicam_650m/URVDBv30_partial --resume --checkpoint_resume checkpoints/esm2_viral_650m/URVDBv30_partial/epoch=0-val_loss=0.80.ckpt
