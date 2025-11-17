@@ -104,7 +104,7 @@ def main():
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained('facebook/esm2_t36_3B_UR50D')
     # Load the PEFT adapter
-    model = PeftModel.from_pretrained(base_model, 'checkpoints/rsawhney_esm2_3B/')
+    model = PeftModel.from_pretrained(base_model, 'checkpoints/esm2_3B_Sawhney/')
     model.eval()  
     model.to('cuda') 
     
