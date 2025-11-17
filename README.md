@@ -20,10 +20,25 @@
 * Feel free to use all and share some contribuition to improve them too.
 
 
-# Set project path
+# Repreducing results
+
+## Set project path and create a virtual environment
 ```bash
 bash setup.sh
 ```
+
+## Extract Embeddings
+```bash
+bash scripts/run_extract_esm2.sh
+bash scripts/run_extract_esmc.sh
+```
+
+## Run regression
+```bash
+bash scripts/run_lassoCV.sh
+```
+
+
 
 ---
 

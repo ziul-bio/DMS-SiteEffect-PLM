@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-# usage
-#taskset -c 50-112 bash run_lassoCV.sh 
+# usage: taskset -c 1-56 bash scripts/run_lassoCV.sh
+
 ########################################################################################################
-#                                      Viral sequences
+#                                      Dataset Definitions
 ########################################################################################################
 
 viral=(
@@ -15,7 +15,7 @@ viral=(
     SARS2_XBB15_RBD_Taylor                 
     
     IAV_NA_Jiang                  IAV_H1_HA_Wu                  IAV_H1_NP_Doud                   IAV_H5_HA_Dadonaite     
-    IAV_H1_HA_Doud                IAV_PA_Wu                     IAV_PB2_Soh                      IAV_RDRP_Li
+    IAV_H1_HA_Doud                IAV_PA_Wu                     IAV_PB2_Soh                      IAV_RDRP_Li                 
     IAV_H3_NP_Doud                IAV_H3_HA_Lee
     
     CVB3_2A_Alvarez               CVB3_2B_Alvarez               CVB3_2C_Alvarez                  CVB3_3A_Alvarez    
@@ -30,12 +30,7 @@ viral=(
     # PESV_POLG_Tsuboyama     BP434_RPC1_Tsuboyama
     ## Multiple
     #AAV2_CAPSD_Sinai
-    )
-
-
-########################################################################################################
-#                                      Non-Viral sequences
-########################################################################################################
+)
 
 cellular=(
     ####################### Riesselman 2018, singles. #######################
@@ -50,47 +45,84 @@ cellular=(
     'BRCA1_HUMAN_BRCT'                'PTEN_HUMAN_Fowler2018'               'UBC9_HUMAN_Roth2017'
     'BRCA1_HUMAN_RING'                'RASH_HUMAN_Kuriyan'                  'UBE4B_MOUSE_Klevit2013_singles'
     'CALM1_HUMAN_Roth2017'            'RL401_YEAST_Bolon2013'               'YAP1_HUMAN_Fields2012_singles'                         
-    )
+)
 
 ########################################################################################################
-
-
-
-
-####################################### Define variables ###############################################
-source="cellular"
-datasets=("${cellular[@]}")
+#                                      Model Configurations
 ########################################################################################################
 
+# All models will be used with all datasets (both viral and cellular)
+declare -a models=(
+    "esmc_600M"
+    "esm2_650M"
+    "esm2_3B_Sawhney"
+    "esm2_650M_CRVDB"
+    "esm2_650M_URVDB"
+)
 
-for dts in "${datasets[@]}"
-do
-    echo "Running regression Random Split for dataset $dts, using ESM2-650M embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/esm2_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_650m/${source}/pool_split/${dts}.csv"    
-    echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using ESM2-650M embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/esm2_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_650m/${source}/site_split/${dts}.csv"    
-    echo " "                                  
+########################################################################################################
+#                                      Regression Function
+########################################################################################################
+
+# Function to run both pool split and site split regression for a dataset
+# Parameters:
+#   $1: dataset name
+#   $2: source type (viral/cellular)
+#   $3: model_name - used for embedding paths, output paths, and logging
+run_regression() {
+    local dts=$1
+    local source=$2
+    local model_name=$3
     
-    echo "Running regression Random Split for dataset $dts, using ESM2 Viral 650M embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/esm2_viral_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_viral_650m/${source}/pool_split/${dts}.csv"    
-    echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using ESM2 Viral 650M embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/esm2_viral_650m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esm2_viral_650m/${source}/site_split/${dts}.csv"    
-    echo " "                                  
+    echo "========================================="
+    echo "Dataset: ${dts}"
+    echo "Model: ${model_name}"
+    echo "========================================="
     
-    echo "Running regression Random Split for dataset $dts, using rsawhney_esm2_3B embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/rsawhney_esm2_3B/${source}/${dts}.pt"  -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/rsawhney_esm2_3B/${source}/pool_split/${dts}.csv"    
-    echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using rsawhney_esm2_3B embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/rsawhney_esm2_3B/${source}/${dts}.pt"  -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/rsawhney_esm2_3B/${source}/site_split/${dts}.csv"    
-    echo " "                                  
+    # Random (Pool) Split
+    echo "Running regression Pool Split using ${model_name} embeddings"
+    python scripts/lassoCV.py \
+        -e "embeddings/${model_name}/${source}/${dts}.pt" \
+        -m "data/${source}/metadata/${dts}.csv" \
+        -o "experiments/lassoCV/${model_name}/${source}/pool_split/${dts}.csv"
+    echo ""
     
-    echo "Running regression Random Split for dataset $dts, using ESMC 600M embeddings"                             
-    python scripts/lassoCV.py -e "embeddings/esmc_600m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esmc_600m/${source}/pool_split/${dts}.csv"    
-    echo " "                                  
-    echo "Running regression Site Split for dataset $dts, using ESMC 600M embeddings"                             
-    python scripts/lassoCV_SS.py -e "embeddings/esmc_600m/${source}/${dts}.pt" -m "data/${source}/metadata/${dts}.csv" -o "experiments/lassoCV/esmc_600m/${source}/site_split/${dts}.csv"    
-    echo " "                                  
+    # Site Split
+    echo "Running regression Site Split using ${model_name} embeddings"
+    python scripts/lassoCV_SS.py \
+        -e "embeddings/${model_name}/${source}/${dts}.pt" \
+        -m "data/${source}/metadata/${dts}.csv" \
+        -o "experiments/lassoCV/${model_name}/${source}/site_split/${dts}.csv"
+    echo ""
+    
+    sleep 5
+}
+
+########################################################################################################
+#                                      Process All Datasets
+########################################################################################################
+
+# Loop through both sources
+for source in "viral" "cellular"; do
+    echo "####################################################################################################"
+    echo "#                                      ${source^^} SEQUENCES"
+    echo "####################################################################################################"
+    
+    # Get the appropriate dataset array
+    if [ "$source" == "viral" ]; then
+        datasets=("${viral[@]}")
+    else
+        datasets=("${cellular[@]}")
+    fi
+    
+    # Process each dataset with each model
+    for dts in "${datasets[@]}"; do
+        for model_name in "${models[@]}"; do
+            run_regression "$dts" "$source" "$model_name"
+        done
+    done
 done
 
+echo "======================================================================================================"
+echo "All regressions complete!"
+echo "======================================================================================================"

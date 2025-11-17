@@ -75,7 +75,7 @@ for source in "viral" "cellular"; do
         python scripts/extract_esmc.py \
             -m "${MODEL_checkpoint}" \
             -i "data/${source}/mutant_sequences/${file}.fasta" \
-            -o "embeddings/esmc_600m/${source}/${file}.pt"
+            -o "embeddings/esmc_600M/${source}/${file}.pt"
     done
 done
 
