@@ -7,12 +7,11 @@
 
 ################ imports #####################
 import os
-import scipy
 import torch
+import hashlib
 import argparse
 import numpy as np
 import pandas as pd
-from scipy import stats
 from sklearn import metrics
 from sklearn.linear_model import LassoCV
 from sklearn.preprocessing import StandardScaler
@@ -27,6 +26,11 @@ from sklearn.exceptions import ConvergenceWarning
 
 
 ###################### Define Functions #######################
+def make_seed(dataset_id, rep):
+    s = f"{dataset_id}_{rep}"
+    h = hashlib.md5(s.encode()).hexdigest()[:8]
+    return int(h, 16)
+
 
 def split_data(meta_data, seed, train_pct=0.8, test_pct=0.2):
     """
@@ -75,7 +79,6 @@ def split_data(meta_data, seed, train_pct=0.8, test_pct=0.2):
 
 def data_prep(path_compressed_embed_file, path_meta_data):
     '''Run regression on compressed embeddings'''
-    
     scaler = StandardScaler()
     meta_data = pd.read_csv(path_meta_data)
     meta_data['target'] = scaler.fit_transform(meta_data['target'].to_frame()).squeeze()
@@ -90,7 +93,7 @@ def data_prep(path_compressed_embed_file, path_meta_data):
 
 
 
-def run_regression(meta_data, embed_df):
+def run_regression(meta_data, embed_df, ds_name):
     '''this version computes y_pred for train and test sets'''
     # Initialize lists for storing results
     folds, num_nonzero_coefs = [], []
@@ -98,9 +101,9 @@ def run_regression(meta_data, embed_df):
     r2s_test, maes_test, rmses_test = [], [], []
     rhos_train, rhos_test = [], []
 
-    for fold, rep in enumerate([1, 2, 3], start=1):
-        # seed is equal to sample size + protein length * rep
-        seed = (meta_data.shape[0] + len(meta_data['sequence'][0])) * rep
+    for fold, rep in enumerate([1, 2, 3, 4, 5], start=1):
+        seed = make_seed(ds_name, rep)
+        
         train, test = split_data(meta_data, seed)
         
         train_data = train.merge(embed_df, how='inner', left_on='ID', right_on='ID')
@@ -116,7 +119,7 @@ def run_regression(meta_data, embed_df):
         # Define and train the regression model
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=ConvergenceWarning)
-            model = LassoCV(max_iter=10000, tol=1e-4, n_jobs=-1)
+            model = LassoCV(max_iter=1000, n_jobs=-1)
             model.fit(X_train, y_train)
 
             # get the number of non-zero coefficients
@@ -164,6 +167,7 @@ def run_regression(meta_data, embed_df):
 def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs):
     # Create dictionary for results
     res_dict = {
+        #"Model": ['Lasso'] * 5,
         "Fold": folds,
         "R2_score_train": r2s_train,
         "MAE_score_train": maes_train,
@@ -202,11 +206,14 @@ def main():
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
-    print('Loading data!')
+    # dataset name to create unique id with a hash function
+    ds_name = output.split('/')[-1].split('.csv')[0] 
+    
+    print(f'Loading dataset {ds_name}!')
     meta_data, embed_df = data_prep(path_compressed_embed_file, path_meta_data)
 
     print('Fitting the model!')
-    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(meta_data, embed_df)
+    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(meta_data, embed_df, ds_name)
     results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs)
     results.to_csv(output)
     print(f'Process Finished!')

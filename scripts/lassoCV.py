@@ -7,8 +7,8 @@
 
 ################ imports #####################
 import os
-import scipy
 import torch
+import hashlib
 import argparse
 import numpy as np
 import pandas as pd
@@ -26,11 +26,17 @@ from sklearn.exceptions import ConvergenceWarning
 
 
 ###################### Define Functions #######################
+def make_seed(dataset_id, rep):
+    s = f"{dataset_id}_{rep}"
+    h = hashlib.md5(s.encode()).hexdigest()[:8]
+    return int(h, 16)
+
+
 def data_prep(path_compressed_embed_file, path_meta_data):
     scaler = StandardScaler()
     meta_data = pd.read_csv(path_meta_data)
-    sample_size = meta_data.shape[0] 
-    protein_length = len(meta_data['sequence'][0])
+    #sample_size = meta_data.shape[0] 
+    #protein_length = len(meta_data['sequence'][0])
     meta_data['target'] = scaler.fit_transform(meta_data['target'].to_frame()).squeeze()
     
     # load and merge the data with features
@@ -43,28 +49,26 @@ def data_prep(path_compressed_embed_file, path_meta_data):
     target = data['target']
     features = data.iloc[:, meta_data.shape[1]:]
 
-    
-    return features, target, sample_size, protein_length
+    return features, target
 
 
 
-def run_regression(features, target, sample_size, protein_length):
+def run_regression(features, target, ds_name):
     # Initialize lists for storing results
     folds, num_nonzero_coefs = [], []
     r2s_train, maes_train, rmses_train = [], [], []
     r2s_test, maes_test, rmses_test = [], [], []
     rhos_train, rhos_test = [], []
 
-    for fold, rep in enumerate([1, 2, 3], start=1):
-        # seed is equal to sample size + protein length * rep
-        seed = (sample_size + protein_length) * rep
+    for fold, rep in enumerate([1, 2, 3, 4, 5], start=1):
+        seed = make_seed(ds_name, rep)
         
         X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=seed)
 
         # Define and train the regression model
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=ConvergenceWarning)
-            model = LassoCV(max_iter=10000, tol=1e-4, n_jobs=-1)
+            model = LassoCV(max_iter=1000, n_jobs=-1)
             model.fit(X_train, y_train)
 
             # get the number of non-zero coefficients
@@ -111,7 +115,7 @@ def run_regression(features, target, sample_size, protein_length):
 
 def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs):
     res_dict = {
-        "Model": ['Lasso'] * 3,
+        #"Model": ['Lasso'] * 5,
         "Fold": folds,
         "R2_score_train": r2s_train,
         "MAE_score_train": maes_train,
@@ -148,11 +152,14 @@ def main():
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
-    print('Loading data!')
-    features, target, sample_size, protein_length = data_prep(path_compressed_embed_file, path_meta_data)
+    # dataset name to create unique id with a hash function
+    ds_name = output.split('/')[-1].split('.csv')[0] 
+    
+    print(f'Loading dataset {ds_name}!')
+    features, target = data_prep(path_compressed_embed_file, path_meta_data)
 
     print('Fitting the model!')
-    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(features, target, sample_size, protein_length)
+    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs = run_regression(features, target, ds_name)
     results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs)
     results.to_csv(output)
     print(f'Process Finished!')
