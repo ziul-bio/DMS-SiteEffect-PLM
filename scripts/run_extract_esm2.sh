@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-# CUDA_VISIBLE_DEVICES=1 bash scripts/run_extract_esm2.sh
+#CUDA_VISIBLE_DEVICES=3 bash scripts/run_extract_esm2.sh
 
 ########################################################################################################
-#                                      Viral sequences
+#                                      Dataset Definitions
 ########################################################################################################
 
 viral=(
@@ -30,55 +30,9 @@ viral=(
     # PESV_POLG_Tsuboyama     BP434_RPC1_Tsuboyama
     ## Multiple
     #AAV2_CAPSD_Sinai
-    )
+)
 
-
-
-########################## Define variables ########################
-source="viral"
-####################################################################
-
-###############  ESM-2 Viral 650M ##############
-# MODEL_checkpoint='checkpoints/esm2_viral_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP_MP40/epoch=41-val_loss=1.36.ckpt'
-# echo "Extracting embedding using model: $MODEL_checkpoint"
-# for file in "${viral[@]}"
-# do
-#     echo "Extracting embedding for $file:"
-#     python scripts/extract_esm2.py esm2_t33_650M_UR50D "data/${source}/mutant_sequences/${file}.fasta" "embeddings/esm2_viral_650m/viral/${file}" --repr_layers 33 --include mean --resume --tuned_checkpoint $MODEL_checkpoint
-# done
-
-
-############## ESM-2 650m ##############
-# MODEL_checkpoint='esm2_650m'
-# echo "Extracting embedding using model: $MODEL_checkpoint"
-# for file in "${viral[@]}"
-# do
-#     echo "Extracting embedding for $file:"
-#     python scripts/extract_esm2.py esm2_t33_650M_UR50D "data/${source}/mutant_sequences/${file}.fasta" "embeddings/${MODEL_checkpoint}/${source}/${file}" --repr_layers 33 --include mean
-# done
-
-
-############### ESM-2 3B ##############
-# MODEL_checkpoint='rsawhney_esm2_3B'
-# echo "Extracting embedding using model: $MODEL_checkpoint"
-# for file in "${viral[@]}"
-# do
-#     echo "Extracting embedding for $file:"
-#     python scripts/extract_esm2_3B_tuned.py -i "data/${source}/mutant_sequences/${file}.fasta" -o "embeddings/${MODEL_checkpoint}/${source}/${file}.pt"
-# done
-
-########################################################################################################
-
-
-
-
-
-
-########################################################################################################
-#                                      Non-Viral sequences
-########################################################################################################
-
-nonviral=(
+cellular=(
     ####################### Riesselman 2018, singles. #######################
     'AMIE_PSEAE_Whitehead'            'DLG4_RAT_Ranganathan2012'            'RL401_YEAST_Bolon2014'
     'B3VI55_LIPSTSTABLE'              'GAL4_YEAST_Shendure2015'             'RL401_YEAST_Fraser2016'
@@ -91,41 +45,95 @@ nonviral=(
     'BRCA1_HUMAN_BRCT'                'PTEN_HUMAN_Fowler2018'               'UBC9_HUMAN_Roth2017'
     'BRCA1_HUMAN_RING'                'RASH_HUMAN_Kuriyan'                  'UBE4B_MOUSE_Klevit2013_singles'
     'CALM1_HUMAN_Roth2017'            'RL401_YEAST_Bolon2013'               'YAP1_HUMAN_Fields2012_singles'                         
-    )
+)
 
 
-
-########################## Define variables ########################
-source="nonviral"
-####################################################################
-
-###############  ESM-2 Viral 650M ##############
-MODEL_checkpoint='checkpoints/esm2_viral_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP_MP40/epoch=41-val_loss=1.36.ckpt'
-echo "Extracting embedding using model: $MODEL_checkpoint"
-for file in "${nonviral[@]}"
-do
-    echo "Extracting embedding for $file:"
-    python scripts/extract_esm2.py esm2_t33_650M_UR50D "data/${source}/mutant_sequences/${file}.fasta" "embeddings/esm2_viral_650m/${source}/${file}" --repr_layers 33 --include mean --resume --tuned_checkpoint $MODEL_checkpoint
-done
-
-
-############## ESM-2 650m ##############
-# MODEL_checkpoint='esm2_650m'
-# echo "Extracting embedding using model: $MODEL_checkpoint"
-# for file in "${nonviral[@]}"
-# do
-#     echo "Extracting embedding for $file:"
-#     python scripts/extract_esm2.py esm2_t33_650M_UR50D "data/${source}/mutant_sequences/${file}.fasta" "embeddings/${MODEL_checkpoint}/${source}/${file}" --repr_layers 33 --include mean
-# done
-
-
-############### ESM-2 3B ##############
-# MODEL_checkpoint='rsawhney_esm2_3B'
-# echo "Extracting embedding using model: $MODEL_checkpoint"
-# for file in "${nonviral[@]}"
-# do
-#     echo "Extracting embedding for $file:"
-#     python scripts/extract_esm2_3B_tuned.py -i "data/${source}/mutant_sequences/${file}.fasta" -o "embeddings/${MODEL_checkpoint}/${source}/${file}.pt"
-# done
 
 ########################################################################################################
+#                                      Extraction Functions
+########################################################################################################
+
+extract_embeddings() {
+    local model_name=$1
+    local model_checkpoint=$2
+    local source=$3
+    local datasets=("${!4}")
+    local script=$5
+    local extra_args="${6:-}"
+    
+    echo "Extracting embeddings using model: $model_checkpoint"
+    for file in "${datasets[@]}"
+    do
+        echo "Extracting embedding for $file:"
+        if [ "$script" == "extract_esm2.py" ]; then
+            python scripts/extract_esm2.py esm2_t33_650M_UR50D \
+                "data/${source}/mutant_sequences/${file}.fasta" \
+                "embeddings/${model_name}/${source}/${file}" \
+                --repr_layers 33 --include mean $extra_args
+        else
+            python scripts/extract_esm2_3B_tuned.py \
+                -i "data/${source}/mutant_sequences/${file}.fasta" \
+                -o "embeddings/${model_name}/${source}/${file}.pt"
+        fi
+    done
+}
+
+########################################################################################################
+#                                      Process All Datasets
+########################################################################################################
+
+# Define models
+declare -A models=(
+    ["esm2_650M_CRVDB"]="checkpoints/esm2_viral_650m/CRVDBv30_partial_MP15/epoch=9-val_loss=1.44.ckpt"
+    ["esm2_650M_URVDB"]="checkpoints/esm2_viral_650m/URVDBv30_partial_MP15/epoch=9-val_loss=0.45.ckpt"
+    ["esm2_650M"]="esm2_650M"
+    ["esm2_3B_Sawhney"]="esm2_3B_Sawhney"
+)
+
+# Process each source (viral and cellular)
+for source in "viral" "cellular"; do
+    echo "========================================="
+    echo "Processing $source sequences"
+    echo "========================================="
+    
+    # Get the appropriate dataset
+    if [ "$source" == "viral" ]; then
+        datasets=("${viral[@]}")
+    else
+        datasets=("${cellular[@]}")
+    fi
+    
+    # Extract with ESM-2 650M CRVDB
+    extract_embeddings "esm2_650M_CRVDB" \
+        "${models[esm2_650M_CRVDB]}" \
+        "$source" \
+        datasets[@] \
+        "extract_esm2.py" \
+        "--resume --tuned_checkpoint ${models[esm2_650M_CRVDB]}"
+    
+    # Extract with ESM-2 650M URVDB
+    extract_embeddings "esm2_650M_URVDB" \
+        "${models[esm2_650M_URVDB]}" \
+        "$source" \
+        datasets[@] \
+        "extract_esm2.py" \
+        "--resume --tuned_checkpoint ${models[esm2_650M_URVDB]}"
+    
+    # Extract with ESM-2 650M (base)
+    extract_embeddings "esm2_650M" \
+        "${models[esm2_650M]}" \
+        "$source" \
+        datasets[@] \
+        "extract_esm2.py"
+    
+    # Extract with ESM-2 3B
+    extract_embeddings "esm2_3B_Sawhney" \
+        "${models[esm2_3B_Sawhney]}" \
+        "$source" \
+        datasets[@] \
+        "extract_esm2_3B_tuned.py"
+done
+
+echo "========================================="
+echo "All extractions complete!"
+echo "========================================="

@@ -1,9 +1,10 @@
 #!/bin/bash
 set -e
 
+#CUDA_VISIBLE_DEVICES=3 bash scripts/run_extract_esmc.sh
 
 ########################################################################################################
-#                                      Viral sequences
+#                                      Dataset Definitions
 ########################################################################################################
 
 viral=(
@@ -29,14 +30,9 @@ viral=(
     # PESV_POLG_Tsuboyama     BP434_RPC1_Tsuboyama
     ## Multiple
     #AAV2_CAPSD_Sinai
-    )
+)
 
-
-########################################################################################################
-#                                      Non-Viral sequences
-########################################################################################################
-
-nonviral=(
+cellular=(
     ####################### Riesselman 2018, singles. #######################
     'AMIE_PSEAE_Whitehead'            'DLG4_RAT_Ranganathan2012'            'RL401_YEAST_Bolon2014'
     'B3VI55_LIPSTSTABLE'              'GAL4_YEAST_Shendure2015'             'RL401_YEAST_Fraser2016'
@@ -49,36 +45,41 @@ nonviral=(
     'BRCA1_HUMAN_BRCT'                'PTEN_HUMAN_Fowler2018'               'UBC9_HUMAN_Roth2017'
     'BRCA1_HUMAN_RING'                'RASH_HUMAN_Kuriyan'                  'UBE4B_MOUSE_Klevit2013_singles'
     'CALM1_HUMAN_Roth2017'            'RL401_YEAST_Bolon2013'               'YAP1_HUMAN_Fields2012_singles'                         
-    )
+)
 
 
 
-######################### Define variables ########################
-source="nonviral"
-datasets=("${nonviral[@]}")
-###################################################################
-
-
-# ESM C 600M
+########################################################################################################
+#                                      Process All Datasets
+########################################################################################################
 MODEL_checkpoint='esmc-600m'
-version=''
-echo "Extracting embedding using model: $MODEL_checkpoint"
-for file in "${datasets[@]}"
-do
-    echo "Extracting embedding for $file:"
-    python scripts/extract_esmc.py -m $MODEL_checkpoint -i "data/${source}/mutant_sequences/${file}.fasta"  -o "embeddings/esmc_600m/${source}/${file}.pt"
+
+echo "Extracting embeddings using model: $MODEL_checkpoint"
+
+# Loop through both sources
+for source in "viral" "cellular"; do
+    echo "========================================="
+    echo "Processing ${source} sequences"
+    echo "========================================="
+    
+    # Get the appropriate dataset array
+    if [ "$source" == "viral" ]; then
+        datasets=("${viral[@]}")
+    else
+        datasets=("${cellular[@]}")
+    fi
+    
+    # Extract embeddings for each dataset
+    for file in "${datasets[@]}"; do
+        echo "Extracting embedding for $file:"
+        python scripts/extract_esmc.py \
+            -m "${MODEL_checkpoint}" \
+            -i "data/${source}/mutant_sequences/${file}.fasta" \
+            -o "embeddings/esmc_600m/${source}/${file}.pt"
+    done
 done
 
-
-# # ViCAM 600M
-#rsync -avP checkpoints/ViCAM_300M/CRVDBv29_maxLen1022_Full_lr5e4_RLRP/epoch=4-val_loss=1.35.ckpt lcv454@wilkcomp01.ccbb.utexas.edu:/stor/work/Wilke/luiz/ViCAM/checkpoints/vicam_300m/CRVDBv29_maxLen1022_Full_lr5e4_RLRP/
-# MODEL_checkpoint='checkpoints/vicam_300m/CRVDBv29_maxLen1022_Full_lr5e4_RLRP/epoch=4-val_loss=1.35.ckpt'
-# version='CRVDBv29_maxLen1022_Full_lr5e4_RLRP'
-
-# echo "Extracting embedding using model: $MODEL_checkpoint"
-# for file in "${datasets[@]}"
-# do
-#     echo "Extracting embedding for $file:"
-#     python scripts/extract_esmc.py -m $MODEL_checkpoint -i "data/${source}/mutant_sequences/${file}.fasta"  -o "embeddings/esmc_viral_600m/${source}/${file}.pt"
-# done
+echo "========================================="
+echo "All extractions complete!"
+echo "========================================="
                 
