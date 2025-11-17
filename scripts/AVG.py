@@ -8,6 +8,7 @@
 ################ imports #####################
 import os
 import re
+import hashlib
 import argparse
 import numpy as np
 import pandas as pd
@@ -19,6 +20,10 @@ from sklearn.preprocessing import StandardScaler
 
 
 ###################### Define Functions #######################
+def make_seed(dataset_id, rep):
+    s = f"{dataset_id}_{rep}"
+    h = hashlib.md5(s.encode()).hexdigest()[:8]
+    return int(h, 16)
 
 def split_mut_sit(mutation):
     parts = re.match(r'([A-Za-z])(\d+)(\S)', mutation) # \S for any non- white space
@@ -31,16 +36,16 @@ def split_mut_sit(mutation):
 def data_prep(path_meta_data):
     scaler = StandardScaler()
     data = pd.read_csv(path_meta_data)
-    sample_size = data.shape[0] 
-    protein_length = len(data['sequence'][0])
+    #sample_size = data.shape[0] 
+    #protein_length = len(data['sequence'][0])
     data['target'] = scaler.fit_transform(data['target'].to_frame()).squeeze()
     data[['wt', 'site', 'mut']] = data['mutant'].apply(lambda x: pd.Series(split_mut_sit(x)))
    
-    return data, sample_size, protein_length
+    return data
 
 
 
-def run_regression(data, sample_size, protein_length):
+def run_regression(data, ds_name):
     '''this version computes y_pred for train and test sets'''
     # Initialize lists for storing results
     folds = []
@@ -48,9 +53,8 @@ def run_regression(data, sample_size, protein_length):
     r2s_test, maes_test, rmses_test = [], [], []
     rhos_train, rhos_test = [], []
 
-    for fold, rep in enumerate([1, 2, 3], start=1):
-        # seed is equal to sample size + protein length * rep
-        seed = (sample_size + protein_length) * rep
+    for fold, rep in enumerate([1, 2, 3, 4, 5], start=1):
+        seed = make_seed(ds_name, rep)
         
         train_data, test_data = train_test_split(data, test_size=0.2, random_state=seed)
 
@@ -101,7 +105,6 @@ def run_regression(data, sample_size, protein_length):
 def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds):
     # Create dictionary for results
     res_dict = {
-        "Model": ['Lasso'] * 3,
         "Fold": folds,
         "R2_score_train": r2s_train,
         "MAE_score_train": maes_train,
@@ -138,11 +141,14 @@ def main():
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
-    # prepare data
-    data, sample_size, protein_length = data_prep(path_meta_data)
+    # dataset name to create unique id with a hash function
+    ds_name = output.split('/')[-1].split('.csv')[0] 
+    
+    print(f'Loading dataset {ds_name}!')
+    data = data_prep(path_meta_data)
 
     # run regression
-    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds = run_regression(data, sample_size, protein_length)
+    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds = run_regression(data, ds_name)
     results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds)
     results.to_csv(output)
     print(f'Process Finished!')

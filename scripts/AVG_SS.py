@@ -8,6 +8,7 @@
 ################ imports #####################
 import os
 import random
+import hashlib
 import argparse
 import numpy as np
 import pandas as pd
@@ -18,6 +19,11 @@ from statsmodels.formula.api import ols
 
 
 ###################### Define Functions #######################
+def make_seed(dataset_id, rep):
+    s = f"{dataset_id}_{rep}"
+    h = hashlib.md5(s.encode()).hexdigest()[:8]
+    return int(h, 16)
+
 
 def split_data(meta_data, seed, train_pct=0.8, test_pct=0.2):
     """
@@ -73,16 +79,15 @@ def data_prep(path_meta_data):
 
 
 
-def run_regression(meta_data):
+def run_regression(meta_data, ds_name):
     '''this version computes y_pred for train and test sets'''
     # Initialize lists for storing results
     folds = []
     r2s_train, maes_train, rmses_train = [], [], []
     r2s_test, maes_test, rmses_test = [], [], []
 
-    for fold, rep in enumerate([1, 2, 3], start=1):
-        # seed is equal to sample size + protein length * rep
-        seed = (meta_data.shape[0] + len(meta_data['sequence'][0])) * rep
+    for fold, rep in enumerate([1, 2, 3, 4, 5], start=1):
+        seed = make_seed(ds_name, rep)
         
         train_data, test_data = split_data(meta_data, seed)
 
@@ -166,11 +171,14 @@ def main():
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
-    # prepare data
+    # dataset name to create unique id with a hash function
+    ds_name = output.split('/')[-1].split('.csv')[0] 
+    
+    print(f'Loading dataset {ds_name}!')
     meta_data = data_prep(path_meta_data)
 
     # run regression
-    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, folds = run_regression(meta_data)
+    r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, folds = run_regression(meta_data, ds_name)
     results = save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, folds)
     results.to_csv(output)
     print(f'Process Finished!')
