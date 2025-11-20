@@ -1,45 +1,49 @@
 import os
+import sys
+# Add project root to sys.path
+sys.path.append(os.path.join(os.path.abspath('..') , 'ESM2ne'))
+from Modules.ESM2ne_Lora import Load_from_pretrained
+
 import random
 import argparse
 import pandas as pd
-
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 import torch
 from torch.optim import AdamW
 from torchmetrics.regression import R2Score
 from torch.utils.data import Dataset, DataLoader
-torch.set_float32_matmul_precision('medium')
+from sklearn.model_selection import train_test_split
+torch.set_float32_matmul_precision('high')
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import CSVLogger
-from pytorch_lightning.tuner.tuning import Tuner
+from pytorch_lightning.callbacks import EarlyStopping
 
-from scripts.ESM2ne_partial import LoadFromPretrained
-
-
-
-#python scripts/LitESM2ne_partial_trainer.py -i data/cellular/metadata/BLAT_ECOLX_Ranganathan2015.csv -o results/fineTune/test/partial/
-#python scripts/LitESM2ne_partial_trainer.py -i data/viral/metadata/IAV_H1_HA_Wu.csv -o experiments/fineTune/esm2_t33_650M_UR50D/viral/pool_split --checkpoint esm2_t33_650M_UR50D --seed 98
-
+#python scripts/LitESM2ne_Lora_trainer.py -i data/cellular/metadata/BLAT_ECOLX_Ranganathan2015.csv -o results/fineTune/test/lora/ --checkpoint_path esm2_t33_650M_UR50D
+#python scripts/LitESM2ne_Lora_trainer.py -i data/cellular/metadata/PABP_YEAST_Fields2013_singles.csv -o results/fineTune/test/lora/ --checkpoint_path esm2_t33_650M_UR50D
+#python scripts/LitESM2ne_Lora_trainer.py -i data/cellular/metadata/YAP1_HUMAN_Fields2012_singles.csv -o results/fineTune/test/lora/ --checkpoint_path esm2_t33_650M_UR50D
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training script arguments.")
     parser.add_argument("-i", "--data", type=str, required=True, help="Path to input CSV file.")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output CSV file path.")
-    parser.add_argument("--split_strategy", type=str, default="pool_split", help="Split strategy to use.")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility.")
-    parser.add_argument("--checkpoint", type=str, default="esm2_t33_650M_UR50D", help="Model checkpoint name or full path.")
+    parser.add_argument("--checkpoint_path", type=str, default="esm2_t33_650M_UR50D", help="Model checkpoint name or full path.")
     parser.add_argument("--num_classes", type=int, default=1, help="Number of classes (1 for regression).")
-    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
-    parser.add_argument("--device", type=str, default=("cuda" if torch.cuda.is_available() else "cpu"), help="Device for training.")
-    parser.add_argument("--learning_rate", type=float, default=5e-4, help="Learning rate.")
+    parser.add_argument("--epochs", type=int, default=40, help="Number of epochs.")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size.")
+    parser.add_argument("--device", type=str, default=0, help="Device for training.")
+    parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay.")
     parser.add_argument("--dropout", type=float, default=0.1, help="CLS dropout probability.")
+    parser.add_argument("--split_strategy", type=str, default="pool_split", help="Split strategy to use.")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
+
+    # LoRA parameters
+    parser.add_argument('--lora_r', type=int, default=4, help='Rank of the low-rank decomposition.')
+    parser.add_argument('--lora_alpha', type=int, default=32, help='Scaling factor for LoRA weights. alpha/rank.')
+    parser.add_argument('--lora_dropout', type=float, default=0.01, help='Dropout rate for LoRA.')
+    parser.add_argument('--lora_modules', nargs='*', type=str, default=["q_proj", "v_proj"], help='Modules to apply LoRA. Default is q_proj, v_proj, as implemented by Microsoft.')
     return parser.parse_args()
 
 
@@ -50,11 +54,10 @@ class MyDataset(Dataset):
     This will be handled later in the collate_fn.
     """
     def __init__(self, data_file):
-        self.scaler = StandardScaler()
         self.data = data_file
         self.sequences = [(d['ID'], d['sequence']) for _, d in self.data.iterrows()]
-        self.targets = self.scaler.fit_transform(self.data['target'].to_frame()).squeeze()
-     
+        self.targets = [d['target'] for _, d in self.data.iterrows()]
+
     def __len__(self):
         return len(self.targets)
 
@@ -69,15 +72,6 @@ class MyDataset(Dataset):
 def split_data(df, seed, train_pct=0.8, val_pct=0.2):
     """
     This function randomly splits a dataframe into train, validation data given a seed by mutation site.
-    Parameters:
-     - df (DataFrame): dataframe containing information about mutants. Mutants should be in the order wt amino acid, site of mutation, mutant amino acid. ex "M1F"
-     - seed (int): the seed to be used when shuffling sites randomly.
-     - train_pct (float): the percentage of data that will be split into the train dataset. Default is 0.8
-     - val_pct (float): the percentage of data that will be split into the validation dataset. Default is 0.2
-
-    Returns:
-     - train_df (DataFrame): the DataFrame containing selected data by site to be used as the train dataset.
-     - val_df (DataFrame): the DataFrame containing selected data by site to be used as the validation dataset.
     """
     # find sites of mutation and order randomly
     df["site"] = [int(s[1:-1]) for s in df["mutant"]]
@@ -106,22 +100,23 @@ def split_data(df, seed, train_pct=0.8, val_pct=0.2):
     return train_df, val_df
 
 
+
+
 class MyDataModule(pl.LightningDataModule):
     def __init__(self, tokenizer, args):
         super().__init__()
         self.args = args
         self.alphabet = tokenizer
         self.split_strategy = args.split_strategy # 'pool_split' or 'site_split'
-        self.seed = args.seed 
-        
+
     def setup(self, stage=None):
         data = pd.read_csv(args.data)
         data = data.query("mutant != 'WT'")
 
         if self.split_strategy == 'site_split':
-            train_df, val_df = split_data(data, seed=self.seed, train_pct=0.8, val_pct=0.2)
+            train_df, val_df = split_data(data, seed=args.seed, train_pct=0.8, val_pct=0.2)
         elif self.split_strategy == 'pool_split':
-            train_df, val_df = train_test_split(data, random_state=self.seed, test_size=0.2)
+            train_df, val_df = train_test_split(data, test_size=0.2, random_state=args.seed)
 
         self.train_dataset = MyDataset(train_df)
         self.val_dataset = MyDataset(val_df)
@@ -133,13 +128,12 @@ class MyDataModule(pl.LightningDataModule):
         # batch: a list of ( (ID, sequence), target )
         seqs = [item[0] for item in batch]
         targets = [item[1] for item in batch]
-    
+
         # Tokenize the sequences
         batch_converter = self.alphabet.get_batch_converter()
-        batch_labels, batch_strs, batch_tokens = batch_converter(seqs)
-        #batch_lens = (batch_tokens != self.alphabet.padding_idx).sum(1)
+        _, _, tokens = batch_converter(seqs)
         targets = torch.stack(targets) # Stack the targets to a shape (batch_size, 1)
-        return batch_tokens, targets
+        return tokens, targets
 
     def train_dataloader(self):
         return DataLoader(
@@ -168,30 +162,33 @@ class LitModel(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.lr = args.learning_rate
-        self.weight_decay = args.weight_decay
         
         # Define the model
-        self.model_loader = LoadFromPretrained(
-            checkpoint=args.checkpoint, num_classes=args.num_classes, hidden_dropout=args.dropout)
+        self.model_loader = Load_from_pretrained(
+            checkpoint_path=args.checkpoint_path, num_classes=args.num_classes, dropout=args.dropout,
+            lora_r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout,
+            lora_modules=args.lora_modules)
         self.model, self.alphabet = self.model_loader.get_model_details()
-
+        
         # metrics and loss function
-        self.loss_fn = torch.nn.MSELoss()
+        self.loss_fn = torch.nn.MSELoss(reduction='mean')
         self.train_r2 = R2Score()
         self.val_r2 = R2Score()
     
-    def forward(self, batch_tokens):
-        outputs = self.model(batch_tokens) # type: ignore
+    def forward(self, tokens):
+        outputs = self.model(tokens) # type: ignore
         return outputs['logits'] 
 
 
-    def training_step(self, batch):
+    def training_step(self, batch, batch_idx):
         """This function will be called for each batch during training.
         It will compute the loss and log it.
         """
-        batch_tokens, targets = batch
-        preds = self(batch_tokens)
+        # batch: a list of ( (ID, sequence), target )
+        # tokens: a tensor of shape (batch_size, seq_len)
+        # targets: a tensor of shape (batch_size, 1)
+        tokens, targets = batch
+        preds = self(tokens)
         loss = self.loss_fn(preds, targets)
         self.train_r2(preds, targets)
         # Log the loss by epoch
@@ -199,9 +196,9 @@ class LitModel(pl.LightningModule):
         self.log("train_r2", self.train_r2, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         return loss
  
-    def validation_step(self, batch):
-        batch_tokens, targets = batch
-        preds = self(batch_tokens)
+    def validation_step(self, batch, batch_idx):
+        tokens, targets = batch
+        preds = self.forward(tokens)
         loss = self.loss_fn(preds, targets)
         self.val_r2(preds, targets)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
@@ -209,54 +206,40 @@ class LitModel(pl.LightningModule):
         return loss # this loss is not used, but I could return something else and modify.
 
     def configure_optimizers(self):
-        #return AdamW((p for p in self.parameters() if p.requires_grad), lr=self.lr, weight_decay=self.weight_decay)
-        return AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-
-
+        return AdamW(self.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
 
 
 def main():
+    # Parse the arguments, and collect the model and dataset names
     args = parse_args()
+    model_name = args.checkpoint_path
+    print(f"Model name: {model_name}")
     dataset_name = args.data.split("/")[-1].split(".csv")[0]
-    print(f"Model checkpoint: {args.checkpoint}")
     print(f"Dataset name: {dataset_name}")
-
-    
-    # ########################## Training setup ##########################
-    logger = CSVLogger(
-            save_dir=args.output,
-            name=f"{dataset_name}",
-            version=args.seed)
-        
-    trainer = pl.Trainer(
-        accelerator="gpu",
-        #strategy="ddp",
-        devices=[1,2], #[0, 1, 2, 3],                  # [0, 1] for 2 GPUs, or -1 for all available GPUs
-        max_epochs= args.epochs,
-        enable_checkpointing=False,
-        #gradient_clip_val=1.0,                     # Clip gradients if they exceed 1.0
-        logger=logger,
-        callbacks=[EarlyStopping(monitor="val_loss", patience=10, mode="min")],
-    )
 
     print("Loading model and dataset...")
     model = LitModel(args)
     datamodule = MyDataModule(model.alphabet, args)
-
-    # print('Finding best learning rate:')
-    # tuner = Tuner(trainer)
-     
-    # # finds learning rate automatically
-    # # sets hparams.lr or hparams.learning_rate to that learning rate
-    # tuner.lr_find(model, datamodule, min_lr=1e-5, max_lr=1e-3, num_training=100)
-
-    # Train with the new LR
+    
+    ########################## Training setup ##########################
+    logger = CSVLogger(
+            save_dir=os.path.join(f"{args.output}", f"{model_name}"),
+            name=f"{dataset_name}",
+            version=args.seed,
+            )
+    
+    trainer = pl.Trainer(
+        accelerator="gpu",
+        devices=[0],
+        max_epochs= args.epochs,
+        enable_checkpointing=False,
+        gradient_clip_val=1.0,  
+        logger=logger,
+        callbacks=[EarlyStopping(monitor="val_loss", patience=5, mode="min")],
+    )
     trainer.fit(model, datamodule)
 
   
-  
-  
-
 if __name__ == '__main__':
     args = parse_args()
     main()

@@ -26,8 +26,8 @@ from sklearn.exceptions import ConvergenceWarning
 
 
 ###################### Define Functions #######################
-def make_seed(dataset_id, rep):
-    s = f"{dataset_id}_{rep}"
+def make_seed(ds_name, rep):
+    s = f"{ds_name}_{rep}"
     h = hashlib.md5(s.encode()).hexdigest()[:8]
     return int(h, 16)
 
@@ -115,7 +115,6 @@ def run_regression(features, target, ds_name):
 
 def save_results(r2s_train, maes_train, rmses_train, r2s_test, maes_test, rmses_test, rhos_train, rhos_test, folds, num_nonzero_coefs):
     res_dict = {
-        #"Model": ['Lasso'] * 5,
         "Fold": folds,
         "R2_score_train": r2s_train,
         "MAE_score_train": maes_train,
