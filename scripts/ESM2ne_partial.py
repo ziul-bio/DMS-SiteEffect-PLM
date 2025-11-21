@@ -94,9 +94,9 @@ class LoadFromPretrained:
 
 
     def setup_model_for_tune(self):
-        print("Freezing all layers but the last two...")
         num_layers = len(self.model.layers)
         n_trainable = 1
+        print(f"Freezing all layers but the last {n_trainable}...")
         trainable_blocks = [f"layers.{i}." for i in range(num_layers - n_trainable, num_layers)] 
         for name, param in self.model.named_parameters():
             param.requires_grad = any(block in name for block in trainable_blocks)

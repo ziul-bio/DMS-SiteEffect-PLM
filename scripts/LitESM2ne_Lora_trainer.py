@@ -193,6 +193,7 @@ class LitModel(pl.LightningModule):
         preds = self(batch_tokens)
         loss = self.loss_fn(preds, targets)
         self.train_r2(preds, targets)
+        self.train_rho(preds, targets)
         # Log the loss by epoch
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log("train_r2", self.train_r2, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
@@ -204,6 +205,7 @@ class LitModel(pl.LightningModule):
         preds = self(batch_tokens)
         loss = self.loss_fn(preds, targets)
         self.val_r2(preds, targets)
+        self.val_rho(preds, targets)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log("val_r2", self.val_r2, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log("val_rho", self.val_rho, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
