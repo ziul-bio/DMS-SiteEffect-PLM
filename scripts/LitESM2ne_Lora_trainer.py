@@ -4,8 +4,8 @@ import sys
 sys.path.append(os.path.join(os.path.abspath('..') , 'ESM2ne'))
 from Modules.ESM2ne_Lora import Load_from_pretrained
 
-import random
 import argparse
+import numpy as np
 import pandas as pd
 
 import torch
@@ -30,19 +30,19 @@ def parse_args():
     parser.add_argument("-o", "--output", type=str, required=True, help="Output CSV file path.")
     parser.add_argument("--checkpoint_path", type=str, default="esm2_t33_650M_UR50D", help="Model checkpoint name or full path.")
     parser.add_argument("--num_classes", type=int, default=1, help="Number of classes (1 for regression).")
-    parser.add_argument("--epochs", type=int, default=40, help="Number of epochs.")
+    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size.")
     parser.add_argument("--device", type=str, default=0, help="Device for training.")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay.")
-    parser.add_argument("--dropout", type=float, default=0.1, help="CLS dropout probability.")
+    parser.add_argument("--dropout", type=float, default=0.2, help="CLS dropout probability.")
     parser.add_argument("--split_strategy", type=str, default="pool_split", help="Split strategy to use.")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
+    parser.add_argument("--seed", type=int, default=1234, help="Random seed for reproducibility.")
 
     # LoRA parameters
-    parser.add_argument('--lora_r', type=int, default=4, help='Rank of the low-rank decomposition.')
-    parser.add_argument('--lora_alpha', type=int, default=32, help='Scaling factor for LoRA weights. alpha/rank.')
-    parser.add_argument('--lora_dropout', type=float, default=0.01, help='Dropout rate for LoRA.')
+    parser.add_argument('--lora_r', type=int, default=8, help='Rank of the low-rank decomposition.')
+    parser.add_argument('--lora_alpha', type=int, default=64, help='Scaling factor for LoRA weights. alpha/rank.')
+    parser.add_argument('--lora_dropout', type=float, default=0.1, help='Dropout rate for LoRA.')
     parser.add_argument('--lora_modules', nargs='*', type=str, default=["q_proj", "v_proj"], help='Modules to apply LoRA. Default is q_proj, v_proj, as implemented by Microsoft.')
     return parser.parse_args()
 
@@ -69,34 +69,36 @@ class MyDataset(Dataset):
 
 
 
-def split_data(df, seed, train_pct=0.8, val_pct=0.2):
+def split_data(df, seed, test_size=0.2):
     """
     This function randomly splits a dataframe into train, validation data given a seed by mutation site.
     """
-    # find sites of mutation and order randomly
-    df["site"] = [int(s[1:-1]) for s in df["mutant"]]
-    sites = df["site"].unique()
-    random.seed(seed)
-    random.shuffle(sites)
-
-    if train_pct + val_pct != 1:
-        print("Split percentages must sum to 1")
-        return
-
-    df_size = df.shape[0]
-    df_val_size = df_size*val_pct
-    val_sites, train_sites = [], []
-
-    # determine sites for validation, then train
+    # Extract unique sites and shuffle
+    df = df.copy()
+    df["site"] = df["mutant"].str.extract(r'(\d+)').astype(int)
+    sites = df["site"].unique().tolist()
+    rng = np.random.default_rng(seed)
+    rng.shuffle(sites)
+    
+    # Populates validation set up to the fraction corresponding to 20%
+    cumsum_rows = 0
+    target_val_rows = len(df) * test_size
+    val_sites = []
     for site in sites:
-        if len(val_sites) <= df_val_size:
-            val_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
+        site_row_count = (df["site"] == site).sum()
+        if cumsum_rows < target_val_rows:
+            val_sites.append(site)
+            cumsum_rows += site_row_count
         else:
-            train_sites.extend([mut_site for mut_site in df["site"] if mut_site == site])
-
-    # subset df for train, val data
-    train_df = df[df["site"].isin(set(train_sites))]
-    val_df = df[df["site"].isin(set(val_sites))]
+            break
+    
+    # Split dataframe
+    val_df = df[df["site"].isin(val_sites)]
+    train_df = df[~df["site"].isin(val_sites)]
+    # Sanity check
+    # if not any(site in train_df['site'].unique() for site in val_df['site'].unique()):
+    #     print('All sites are unique for train or test.')
+        
     return train_df, val_df
 
 
@@ -117,7 +119,7 @@ class MyDataModule(pl.LightningDataModule):
             train_df, val_df = split_data(data, seed=args.seed, train_pct=0.8, val_pct=0.2)
         elif self.split_strategy == 'pool_split':
             train_df, val_df = train_test_split(data, test_size=0.2, random_state=args.seed)
-
+        
         self.train_dataset = MyDataset(train_df)
         self.val_dataset = MyDataset(val_df)
        
@@ -230,7 +232,7 @@ def main():
     
     trainer = pl.Trainer(
         accelerator="gpu",
-        devices=[0],
+        devices=[args.device],
         max_epochs= args.epochs,
         enable_checkpointing=False,
         gradient_clip_val=1.0,  

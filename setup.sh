@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#chmod -R a+rx checkpoints
+
+
 # Project and Venv paths (dynamically determined based on current directory)
 PROJECT_PATH="$(pwd)"
 VENV_PATH="$PROJECT_PATH/venv"
