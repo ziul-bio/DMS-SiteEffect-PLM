@@ -32,47 +32,37 @@ def make_seed(dataset_id, rep):
     return int(h, 16)
 
 
-def split_data(meta_data, seed, train_pct=0.8, test_pct=0.2):
+def split_data(df, seed, test_size=0.2):
     """
-    This function randomly splits a dataframe into train, test, and validation data given a seed by mutation site.
+    This function randomly splits a dataframe into train, validation data given a seed by mutation site.
+    """
+    # Extract unique sites and shuffle
+    df = df.copy()
+    df["site"] = df["mutant"].str.extract(r'(\d+)').astype(int)
+    sites = df["site"].unique().tolist()
+    rng = np.random.default_rng(seed)
+    rng.shuffle(sites)
     
-    Parameters:
-     - df (DataFrame): dataframe containing information about mutants. Mutants should be in the order wt amino acid, site of mutation, mutant amino acid. ex "M1F"
-     - seed (int): the seed to be used when shuffling sites randomly.
-     - train_pct (float): the percentage of data that will be split into the train dataset. Default is 0.8
-     - test_pct (float): the percentage of data that will be split into the test dataset. Default is 0.2
-
-    Returns:
-     - train_df (DataFrame): the DataFrame containing randomly selected data by site to be used as the train dataset.
-     - test_df (DataFrame): the DataFrame containing randomly selected data by site to be used as the test dataset.
-     - val_df (DataFrame): the DataFrame containing randomly selected data by site to be used as the val dataset.
-    """
-    # find sites of mutation and order randomly
-    meta_data["site"] = [int(s[1:-1]) for s in meta_data["mutant"]]
-    sites = meta_data["site"].unique()
-    random.seed(seed)
-    random.shuffle(sites)
-
-    if train_pct + test_pct != 1:
-        print("Split percentages must sum to 1")
-        return
-
-    df_size = meta_data.shape[0]
-    df_test_size = df_size*test_pct
-    test_sites, train_sites = [], []
-
-    # determine sites for test, then train
+    # Populates validation set up to the fraction corresponding to 20%
+    cumsum_rows = 0
+    target_val_rows = len(df) * test_size
+    val_sites = []
     for site in sites:
-        if len(test_sites) <= df_test_size:
-            test_sites.extend([mut_site for mut_site in meta_data["site"] if mut_site == site])
+        site_row_count = (df["site"] == site).sum()
+        if cumsum_rows < target_val_rows:
+            val_sites.append(site)
+            cumsum_rows += site_row_count
         else:
-            train_sites.extend([mut_site for mut_site in meta_data["site"] if mut_site == site])
-
-    # subset df for train, test data
-    train_df = meta_data[meta_data["site"].isin(set(train_sites))]
-    test_df = meta_data[meta_data["site"].isin(set(test_sites))]
-
-    return train_df, test_df
+            break
+    
+    # Split dataframe
+    val_df = df[df["site"].isin(val_sites)]
+    train_df = df[~df["site"].isin(val_sites)]
+    # Sanity check
+    # if not any(site in train_df['site'].unique() for site in val_df['site'].unique()):
+    #     print('All sites are unique for train or test.')
+        
+    return train_df, val_df
 
 
 
