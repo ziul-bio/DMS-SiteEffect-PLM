@@ -223,7 +223,7 @@ def main():
 
     # Parse the arguments, and collect the model and dataset names
     args = parse_args()
-    model_name = [x for x in ['vicam_300m', 'vicam_600m','esmc_300m', 'esmc_600m'] if x in args.checkpoint_path][0]
+    model_name = args.checkpoint_path
     print(f"Model name: {model_name}")
     dataset_name = args.data.split("/")[-1].split(".csv")[0]
     print(f"Dataset name: {dataset_name}")
@@ -236,7 +236,6 @@ def main():
     
     ########################## Training setup ##########################
     logger = CSVLogger(
-            #save_dir=os.path.join(f"{args.output}", f"{model_name}"),
             save_dir=os.path.join(f"{args.output}"),
             name=f"{dataset_name}",
             version=f'{args.split_strategy}/seed_{args.seed}',)

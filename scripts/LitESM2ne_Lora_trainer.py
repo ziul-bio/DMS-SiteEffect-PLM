@@ -1,8 +1,8 @@
 import os
 import sys
 # Add project root to sys.path
-sys.path.append(os.path.join(os.path.abspath('..') , 'ESM2ne'))
-from Modules.ESM2ne_Lora import Load_from_pretrained
+#sys.path.append(os.path.join(os.path.abspath('..') , 'ESM2ne'))
+from scripts.ESM2ne_Lora import Load_from_pretrained
 
 import argparse
 import numpy as np
@@ -10,7 +10,7 @@ import pandas as pd
 
 import torch
 from torch.optim import AdamW
-from torchmetrics.regression import R2Score
+from torchmetrics.regression import R2Score, SpearmanCorrCoef
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 torch.set_float32_matmul_precision('high')
@@ -176,35 +176,37 @@ class LitModel(pl.LightningModule):
         self.loss_fn = torch.nn.MSELoss(reduction='mean')
         self.train_r2 = R2Score()
         self.val_r2 = R2Score()
+
+        self.train_rho = SpearmanCorrCoef()
+        self.val_rho = SpearmanCorrCoef()
     
-    def forward(self, tokens):
-        outputs = self.model(tokens) # type: ignore
+    def forward(self, batch_tokens):
+        outputs = self.model(batch_tokens) # type: ignore
         return outputs['logits'] 
 
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch):
         """This function will be called for each batch during training.
         It will compute the loss and log it.
         """
-        # batch: a list of ( (ID, sequence), target )
-        # tokens: a tensor of shape (batch_size, seq_len)
-        # targets: a tensor of shape (batch_size, 1)
-        tokens, targets = batch
-        preds = self(tokens)
+        batch_tokens, targets = batch
+        preds = self(batch_tokens)
         loss = self.loss_fn(preds, targets)
         self.train_r2(preds, targets)
         # Log the loss by epoch
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log("train_r2", self.train_r2, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log("train_rho", self.train_rho, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         return loss
  
-    def validation_step(self, batch, batch_idx):
-        tokens, targets = batch
-        preds = self.forward(tokens)
+    def validation_step(self, batch):
+        batch_tokens, targets = batch
+        preds = self(batch_tokens)
         loss = self.loss_fn(preds, targets)
         self.val_r2(preds, targets)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log("val_r2", self.val_r2, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log("val_rho", self.val_rho, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         return loss # this loss is not used, but I could return something else and modify.
 
     def configure_optimizers(self):
