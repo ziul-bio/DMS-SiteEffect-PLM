@@ -70,28 +70,14 @@ class LitModel(pl.LightningModule):
  
 
     def configure_optimizers(self):
-        warmup_epochs = 2
+        warmup_epochs = 1
         tmax_epochs = args.epochs
         optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
         warmup = LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)                                         # total iterations that warmup will last. warms up to 0.01*learning_rate
-        #decay = ConstantLR(optimizer, factor=1.0, total_iters=tmax)
         decay = CosineAnnealingLR(optimizer, T_max=tmax_epochs - warmup_epochs, eta_min=self.learning_rate * 0.01)         # T_max is the number of iterations for cosine annealing. decays to 0.01*learning_rate
         scheduler = SequentialLR(optimizer, schedulers=[warmup, decay], milestones=[warmup_epochs])                        # milestones means when to switch from warm up to lr decay
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
         
-
-    # def configure_optimizers(self):
-    #     Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
-    #     # v01 with learning rate 4e-4, and MLM 15% (80, 10, 10).
-    #     # LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0) # It decays exponentially, by 10% each time it's triggered.
-    #     # v02 with learning rate 4e-4, and MLM 40% (100, 0, 0).
-    #     LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.5, patience=0, cooldown=0) # It decays exponentially, by 50% each time it's triggered.
-
-    #     return {
-    #         "optimizer": Optimizer,
-    #         "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss", "interval": "epoch", "frequency": 1}
-    #         }
-
 
 def main(args):
 
@@ -121,7 +107,7 @@ def main(args):
     
     early_stopping_callback = EarlyStopping(
         monitor='val_loss',
-        patience=5,                        # I am looking for 5 epochs, so patience=5*number of checks per epoch
+        patience=5,                      
         mode='min',
         min_delta=0.001,
     )
@@ -130,9 +116,6 @@ def main(args):
         accelerator="gpu",
         devices=-1,                          # [0, 1] for 2 GPUs, or -1 for all available GPUs
         strategy="ddp",
-        #strategy='ddp_find_unused_parameters_true',
-        #strategy=DDPStrategy(find_unused_parameters=True),
-        #accumulate_grad_batches=100,            # simulate a × larger batch size (so 20x4=80) 
 	    max_epochs= args.epochs,                 
         enable_checkpointing=True,
         gradient_clip_val=1.0,               # Clip gradients if they exceed 1.0
