@@ -5,19 +5,11 @@
   <img src="images/banner.png" >
 </p>
 
-# ViCAM
-<sub> *A viral pLM*  fine-tuned to understand viral protein language </sub>
+# Intrinsic dataset features drive mutational effect prediction by protein language models
 
 
-
-
-## About ViCAM:
-
-* Viral fine-tuning of CAMbriam
-
-* 
-
-* Feel free to use all and share some contribuition to improve them too.
+## Abstract:
+Protein language models (pLMs) are widely used for predicting protein fitness landscapes, but their low performance on certain datasets remains poorly understood. We evaluated supervised transfer learning on 41 viral and 33 cellular deep mutational scanning datasets using embeddings from multiple pLMs. Viral datasets consistently exhibited lower predictive performance compared to cellular datasets, independent of model architecture, size, or transfer learning strategy. Surprisingly, a simple baseline that predicts site mean fitness outperformed supervised models on most datasets, highlighting the dominant role of site effects. Analysis of site variability using two metrics, Relative Variability of Site Means (RVSM) and Fraction of Highly Variable Sites (FHVS), revealed that limited within-site fitness variation in proteins constrains model performance. Moreover, splitting data by site, rather than pooling, revealed that supervised models often rely on site effects rather than capturing broader mutational patterns. Finally, RVSM and FHVS strongly predicted the performance of models across datasets in ProteinGym, indicating that fitness variability alone largely determines predictability. These findings highlight limitations of current pLMs on certain proteins and suggest that dataset composition, rather than model architecture or training, is the primary driver of predictive success.
 
 
 # Repreducing results
@@ -38,19 +30,16 @@ bash scripts/run_extract_esmc.sh
 bash scripts/run_lassoCV.sh
 ```
 
+## Run finetune
+```bash
+bash scripts/run_ESM2ne_viral.sh
+bash scripts/run_ESM2ne_cellular.sh
 
+```
+
+## Plotting figures in the paper
+```R
+notebooks/plots.Rmd
+```
 
 ---
-
-
-## To do list:
-- [ ] Download database: RVDB
-- [ ] Download datasets: 51 viral DMS
-- [ ] Implement the MLM head on the ESMC
-- [ ] Train the ViCAM
-- [ ] Transfer leaninrg with the original ESMC 300M on the 51 DMS to benchemark our model. 
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
