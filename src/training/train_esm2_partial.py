@@ -12,7 +12,7 @@ from pytorch_lightning.strategies import DDPStrategy
 #import esm
 from src.model.ESM2_MLM_partial import Load_from_pretrained
 
-from src.data.dataset_esm2 import MyDataModule
+from src.data.dataset import MyDataModule
 from src.model.esm2_config import config
 
 
