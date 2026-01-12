@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.optim import AdamW 
-from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR
 torch.set_float32_matmul_precision('medium')
 
 import pytorch_lightning as pl
@@ -16,10 +16,6 @@ from src.data.dataset import MyDataModule
 from src.model.esm2_config import config
 
 
-###### RUNNING EXAMPLES ######  
-# python src/training/train_esm2_partial.py -o test/
-# python src/training/train_esm2_partial.py -o esm2_viral_650m/URVDBv30_partial
-# python src/training/train_esm2_partial.py -o esm2_vicam_650m/URVDBv30_partial --resume --checkpoint_resume checkpoints/esm2_viral_650m/URVDBv30_partial/epoch=0-val_loss=0.80.ckpt
 
 
 ################ pytorch lightning model ######################
@@ -165,3 +161,9 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint_resume', type=str)
     args = parser.parse_args()
     main(args)
+
+
+###### RUNNING EXAMPLES ######  
+# python src/training/train_esm2_partial.py -o test/
+# python src/training/train_esm2_partial.py -o esm2_viral_650m/URVDBv30_partial
+# python src/training/train_esm2_partial.py -o esm2_viral_650m/URVDBv30_partial --resume --checkpoint_resume checkpoints/esm2_viral_650m/URVDBv30_partial/epoch=0-val_loss=0.80.ckpt

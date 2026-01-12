@@ -1,19 +1,18 @@
 import torch
 import torch.nn as nn
 from torch.optim import AdamW 
-from torch.optim.lr_scheduler import SequentialLR, LinearLR, ConstantLR, CosineAnnealingLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR
 torch.set_float32_matmul_precision('medium')
 
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger, CSVLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.tuner.tuning import Tuner
-from pytorch_lightning.strategies import DDPStrategy
 
 #import esm
 from src.model.ESM2_MLM import Load_from_pretrained
 
-from src.data.dataset_esm2 import MyDataModule
+from src.data.dataset import MyDataModule
 from src.model.esm2_config import config
 
 
@@ -69,16 +68,21 @@ class LitModel(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        Optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
-        # v01 with learning rate 4e-4, and MLM 15% (80, 10, 10).
-        # LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.9, patience=1, cooldown=0) # It decays exponentially, by 10% each time it's triggered.
-        # v02 with learning rate 4e-4, and MLM 40% (100, 0, 0).
-        LRscheduler = ReduceLROnPlateau(Optimizer, mode='min', factor=0.5, patience=0, cooldown=0) # It decays exponentially, by 50% each time it's triggered.
-
+        #steps_per_epoch = 41260 #3GPUs
+        steps_per_epoch = 20630 #6GPUs
+        optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2))
+        warmup = LinearLR(optimizer, start_factor=0.1, total_iters=steps_per_epoch)
+        cosine = CosineAnnealingLR(optimizer, T_max=5*steps_per_epoch, eta_min=self.learning_rate*0.1)
+        scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[steps_per_epoch])  # milestone is when to switch from warm up to decay.
+        
         return {
-            "optimizer": Optimizer,
-            "lr_scheduler": {"scheduler": LRscheduler, "monitor": "val_loss", "interval": "epoch", "frequency": 1}
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1
             }
+        }
 
 
 def main(args):
@@ -170,6 +174,6 @@ if __name__ == '__main__':
 
 
 ###### RUNNING EXAMPLES ######  
-# python src/training/train_esm2.py -o esm2_vicam_650m/test_lr_finder --LRfinder
-# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_test
-# python src/training/train_esm2.py -o esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP --resume --checkpoint_resume checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP/epoch=5-val_loss=1.44.ckpt
+# python src/training/train_esm2.py -o esm2_650m_viral/test_lr_finder --LRfinder
+# python src/training/train_esm2.py -o esm2_650m_viral/CRVDBv29_maxLen1022_Full_test
+# python src/training/train_esm2.py -o esm2_650m_viral/CRVDBv29_maxLen1022_Full_lr4e4_RLRP --resume --checkpoint_resume checkpoints/esm2_vicam_650m/CRVDBv29_maxLen1022_Full_lr4e4_RLRP/epoch=5-val_loss=1.44.ckpt
