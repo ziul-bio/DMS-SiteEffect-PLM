@@ -6,12 +6,10 @@ import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from Bio import SeqIO
 
-from esm.models.esmc import ESMC
-from esm.tokenization import get_esmc_model_tokenizers
-tokenizer = get_esmc_model_tokenizers()
-
-
-
+import esm
+# Load ESM-2 model
+model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+batch_converter = alphabet.get_batch_converter()
 
 class MLM:
     """
@@ -86,6 +84,7 @@ class MLM:
 
 
 
+
 class MyDataset(Dataset):
     """This function collates a batch, tokenizes and pads the sequences,
     and applies the MLM masking strategy to produce inputs and targets.
@@ -109,13 +108,13 @@ class MyDataModule(pl.LightningDataModule):
         self.batch_size = args.batch_size
 
         self.mlm = MLM(
-            padding_token=tokenizer.pad_token_id,
-            mask_token=tokenizer.mask_token_id,
-            no_mask_tokens=[tokenizer.cls_token_id, tokenizer.eos_token_id],
-            n_tokens=tokenizer.vocab_size,
-            masking_prob=0.15,
-            randomize_prob=0.1,
-            no_change_prob=0.1
+            padding_token=alphabet.padding_idx,
+            mask_token=alphabet.mask_idx,
+            no_mask_tokens=[alphabet.cls_idx, alphabet.eos_idx],
+            n_tokens=len(alphabet.all_toks),
+            masking_prob=0.4,
+            randomize_prob=0,
+            no_change_prob=0
         )
     
 
@@ -123,46 +122,43 @@ class MyDataModule(pl.LightningDataModule):
         """This method will load the data splits preprocessed."""
 
         with open(f"{self.data_folder}/train.fasta", "r") as f:
-            train_sequences = [str(record.seq) for record in SeqIO.parse(f, "fasta")]
+            train_sequences = [(str(record.id), str(record.seq)) for record in SeqIO.parse(f, "fasta")]
             self.train_dataset =MyDataset(train_sequences) 
 
         with open(f"{self.data_folder}/val.fasta", "r") as f:
-            
-            val_sequences = [str(record.seq) for record in SeqIO.parse(f, "fasta")]
+            val_sequences = [(str(record.id), str(record.seq)) for record in SeqIO.parse(f, "fasta")]
             self.val_dataset = MyDataset(val_sequences)
 
         with open(f"{self.data_folder}/test.fasta", "r") as f:
-            
-            test_sequences = [str(record.seq) for record in SeqIO.parse(f, "fasta")]
+            test_sequences = [(str(record.id), str(record.seq)) for record in SeqIO.parse(f, "fasta")]
             self.test_dataset = MyDataset(test_sequences)
     
             
     
-    def gpt_collate_fn(self, batch):
+    def bert_collate_fn(self, batch):
         """This function will be used to collate (collect and combine) the data into a batch.
         It will handle the tokenization and padding of the sequences.
         And also creates the target sequence shifted by one, in relation to the input sequence.
         """
         # Tokenize the batch of sequences
-        tokens = tokenizer(batch, padding=True, return_tensors="pt")
-        
-        # Remove EOS from the sequence (except the last token)
-        sequence = tokens['input_ids']
+        batch_labels, batch_strs, batch_tokens = batch_converter(batch)
 
-        x, y = self.mlm(sequence)
+        x, y = self.mlm(batch_tokens)
+       
         
         return {
             'input_ids': x,
-            'labels': y
+            'labels': y,
         }
 
+    
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            collate_fn=self.gpt_collate_fn,
-            num_workers=8,
+            collate_fn=self.bert_collate_fn,
+            num_workers=4,
             pin_memory=True,
             drop_last=True,
         )
@@ -171,8 +167,8 @@ class MyDataModule(pl.LightningDataModule):
         return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
-            collate_fn=self.gpt_collate_fn,
-            num_workers=8,
+            collate_fn=self.bert_collate_fn,
+            num_workers=4,
             pin_memory=True,
             drop_last=True,
         )
@@ -181,8 +177,8 @@ class MyDataModule(pl.LightningDataModule):
         return DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
-            collate_fn=self.gpt_collate_fn,
-            num_workers=8,
+            collate_fn=self.bert_collate_fn,
+            num_workers=4,
             pin_memory=True,
             drop_last=True,
         )
@@ -192,7 +188,7 @@ if __name__ == "__main__":
     print("Running test on the dataset module")
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('--dataDir', type=str, default='data/processed/example/')
+    parser.add_argument('--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen1022_20aa/')
     parser.add_argument('--batch_size', type=int, default=1)
     args = parser.parse_args()
 
