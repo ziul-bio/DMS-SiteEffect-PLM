@@ -1,0 +1,528 @@
+# Figure Construction and Composition
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(cowplot)
+```
+
+## still need to change column names in res_lassoCV_all_models.csv to lowercase_underscore format for Fold, Dataset, Model, Source, Split
+
+```{r}
+# lassoCV full results
+full_res <- read_csv("../experiments/compiled_results/res_lassoCV_all_models.csv")
+full_res
+```
+
+```{r}
+# Group and average
+cols <- c("rho_score_test", "R2_score_test", "rho_score_train", "R2_score_train", "prot_length")
+
+full_res_avg <- full_res %>%
+  group_by(Model, Source, Dataset, Split) %>%
+  summarise(across(all_of(cols), mean)) %>%
+  mutate(Source = factor(Source, levels = c("viral", "cellular")))
+
+full_res_avg
+```
+
+# Figure 1
+```{r}
+esm2_pooled_avg <- full_res_avg[full_res_avg$Model == "ESM-2 650M" & full_res_avg$Split == "Pooled Split",]
+esm2_pooled_avg
+```
+
+
+```{r}
+# Figure 1 A
+p1a <- ggplot(esm2_pooled_avg, aes(x = prot_length, y = R2_score_test, color = Source)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 3, alpha = 0.55, stroke=0) +
+  geom_line(stat="smooth",method = "lm", size = 0.8, alpha = 0.55) +
+  
+  scale_x_log10(
+    name=expression(italic(R)^2)
+  ) +
+  
+  scale_y_continuous(
+    name="Protein Length",
+    limits = c(-0.3, 1),
+    breaks = c(0, 0.3, 0.6, 0.9)
+  ) +
+
+  theme_bw() +
+  theme(legend.position = 'none', legend.title = element_blank(), panel.grid.minor = element_blank())
+
+print(p1a)
+```
+
+
+
+
+```{r}
+# Figure 1 B
+p1b <- ggplot(esm2_pooled_avg, aes(x = R2_score_test)) +
+  geom_density(aes(fill = Source),  alpha = 0.55, linewidth = 0.25) +
+  scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  
+  scale_y_continuous(name="Density",
+                     expand = c(0, 0, 0.05, 0)) +
+  
+  scale_x_continuous(name=expression(italic(R)^2),
+                     expand = c(0, 0, 0.0, 0.0)) +
+  
+  theme_bw() +
+  theme(legend.position = 'none',
+        legend.title = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(0.068, 0.068, 0.038, 0.068, "in"))
+
+print(p1b)
+```
+
+
+
+
+```{r}
+# Figure 1 C
+full_pooled_avg <- full_res_avg[full_res_avg$Split == "Pooled Split",] %>% 
+ mutate(Model = factor(Model, levels = c('ESM-2 650M', 'ESM C 600M', 'ESM-2-CRVDB', 'ESM-2-URVDB', 'ESM-2 3B Sawhney')))
+
+
+
+p1c <- ggplot(full_pooled_avg, aes(x = Model, y = R2_score_test, fill = Source)) +
+  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.35, alpha = 0.55, linewidth = 0.25) +
+  scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
+  
+  scale_x_discrete(name='Model') +
+  scale_y_continuous(name=expression(italic(R)^2)) +
+  
+  theme_bw() +
+  theme(
+    legend.position = 'none',
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    legend.title = element_blank()
+  )
+  
+print(p1c)
+```
+
+
+
+## Composition
+```{r,width = 8, height = 7}
+# Extract the shared legend from one of the plots
+shared_legend <- get_legend(
+  p1b + theme(
+    legend.position = "top",
+    legend.justification = "right",
+    legend.direction = "horizontal"
+  )
+)
+
+# Specify positioning for figure composition
+fig1_top <- plot_grid(p1a, p1b, ncol = 2, labels = c('A', 'B'), label_fontface = "plain")
+fig1_bottom <- plot_grid(p1c, labels = c('C'), label_fontface = "plain")
+
+# Compose figure 1
+fig1 <- plot_grid(
+  fig1_top,
+  shared_legend,
+  fig1_bottom,
+  ncol = 1,
+  rel_heights = c(1, 0.07, 1)
+)
+
+print(fig1)
+
+#ggsave(path = '../experiments/figures', 'comp1_pLMs_res_v03.png', width = 8, height = 7, units = 'in', dpi = 600, bg='white')
+```
+
+
+
+
+
+
+
+# Figure 2
+
+```{r}
+# Figure 2 A
+lassoCV_AVG <- read_csv("../experiments/compiled_results/lassoCV_AVG_all.csv", show_col_types = FALSE)
+lassoCV_AVG
+
+p2a <- ggplot(lassoCV_AVG, aes(x = R2_AVG, y = R2_ESM2_650M, color = Source)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 2.5, alpha = 0.55, stroke = 0) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
+  theme_bw() +
+  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  labs(
+    y = expression(paste(R^{2}, ' transfer learning')),
+    x = expression(paste(R^{2}, ' site-means'))) +
+  xlim(-0.55, 0.85) +
+  ylim(-0.55, 0.85)
+
+print(p2a)
+```
+
+```{r}
+# Figure 2 B
+res_OLS <- read_csv("../experiments/compiled_results/res_OLS.csv", show_col_types = FALSE)
+res_OLS
+
+p2b <- ggplot(res_OLS, aes(x = Model, y = R2, fill = Source)) +
+  scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_boxplot(alpha = 0.5) +
+  theme_bw() +
+  labs(
+    x = 'Independent variable',
+    y = expression(paste(R^2, ' ordinary least squares (OLS)'))
+    ) +
+  theme(
+    legend.position = 'none',
+    panel.grid.major.x = element_blank()
+  )
+  
+print(p2b)
+```
+
+## Composition
+```{r}
+# Extract the shared legend from one of the plots
+shared_legend <- get_legend(
+  p1b + theme(
+    legend.position = "top",
+    legend.justification = "center",
+    legend.direction = "horizontal"
+  )
+)
+
+# Compose figure 2
+fig2 <- plot_grid(
+  shared_legend,
+  plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), rel_widths = c(1, 1)),
+  ncol = 1,
+  rel_heights = c(0.07, 1)
+)
+
+print(fig2)
+
+ggsave('comp2_lassoCV_AVG_OLS_v03.png', width = 8, height = 3.5, units = 'in', dpi = 300, path = '../experiments')
+```
+
+
+# Figure 3
+```{r}
+# Load variability metrics results
+res_var <- read_csv("../experiments/compiled_results/res_lassoCV_esm2_650m_all_metrics.csv", show_col_types = FALSE)
+res_var <- res_var[res_var$Split == "Pooled Split",]
+res_var
+```
+
+```{r}
+# Figure 3 A
+corr_viral <- cor.test(res_var[res_var$Source == "viral",]$RVSM, res_var[res_var$Source == "viral",]$R2_score_test)
+corr_cellular <- cor.test(res_var[res_var$Source == "cellular",]$RVSM, res_var[res_var$Source == "cellular",]$R2_score_test)
+
+p3a <- ggplot(res_var, aes(x = RVSM, y = R2_score_test, color = Source)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 2.5, alpha = 0.5) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  annotate(
+    "text",
+    x = 0.401, y = 0.82,
+    hjust = 0, vjust = 1,
+    size = 4,
+    label = sprintf("r = %.3f", corr_viral$estimate),
+    color = '#D55E00'
+  ) +
+  annotate(
+    "text",
+    x = 0.401, y = 0.76,
+    hjust = 0, vjust = 1,
+    size = 4,
+    label = sprintf("r = %.3f", corr_cellular$estimate),
+    color = '#0072B2'
+  ) +
+  theme_bw() +
+  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  labs(
+    y = expression(paste(R^{2}, ' transfer learning')),
+    x = "Relative variability of site means"
+  )
+
+print(p3a)
+```
+
+```{r}
+# Figure 3 B
+corr_RF_viral <- cor.test(res_var[res_var$Source == "viral",]$RVSM, res_var[res_var$Source == "viral",]$FHVS)
+corr_RF_cellular <- cor.test(res_var[res_var$Source == "cellular",]$RVSM, res_var[res_var$Source == "cellular",]$FHVS)
+
+p3b <- ggplot(res_var, aes(x = RVSM, y = FHVS, color = Source)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 2.5, alpha = 0.5) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  annotate(
+    "text",
+    x = 0.7, y = 0.90,
+    hjust = 0, vjust = 1,
+    size = 4,
+    label = sprintf("r = %.3f", corr_RF_viral$estimate),
+    color = '#D55E00'
+  ) +
+  annotate(
+    "text",
+    x = 0.7, y = 0.85,
+    hjust = 0, vjust = 1,
+    size = 4,
+    label = sprintf("r = %.3f", corr_RF_cellular$estimate),
+    color = '#0072B2'
+  ) +
+  theme_bw() +
+  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  labs(y = 'Fraction of highly variable sites', x = 'Relative variability of site means')
+
+print(p3b)
+```
+
+```{r}
+# Figure 3 C -- unfinished
+p3c <- ggplot(res_var, aes(x = FHVS, y = R2_score_test)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 2.5, alpha = 0.5, aes(color = Source)) +
+  geom_smooth(method = 'lm', formula = 'y ~ I(x*x) + x', se=FALSE, color = '#636363') +
+  theme_bw() +
+  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  labs(y = expression(paste(R^{2}, " transfer learning")),
+        x = "Fraction of highly variable sites"
+  )
+  
+print(p3c)
+```
+
+```{r}
+# Figure 3 D
+lassoCV_AVG <- read_csv("../experiments/compiled_results/lassoCV_AVG_all.csv", show_col_types = FALSE)
+lassoCV_AVG
+
+p3d <- ggplot(lassoCV_AVG, aes(x = R2_AVG_HVS, y = R2_ESM2_650M_HVS, color = Source)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 2.5, alpha = 0.55, stroke = 0) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
+  theme_bw() +
+  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  labs(
+    y = expression(paste(R^{2}, ' transfer learning')),
+    x = expression(paste(R^{2}, ' site-means'))) +
+  xlim(-1.00, 0.82) +
+  ylim(-1.00, 0.82)
+
+print(p3d)
+```
+
+## Composition
+
+```{r}
+# Extract the shared legend from one of the plots
+shared_legend <- get_legend(
+  p1b + theme(
+    legend.position = "top",
+    legend.justification = "center",
+    legend.direction = "horizontal"
+  )
+)
+
+# Compose figure 3
+fig3 <- plot_grid(
+  shared_legend,
+  plot_grid(p3a, p3b, p3c, p3d, ncol = 2, nrow = 2, labels = c('A', 'B', 'C', 'D'), rel_widths = c(1, 1), rel_heights = c(1, 1)),
+  ncol = 1,
+  rel_heights = c(0.07, 1)
+)
+
+print(fig3)
+
+ggsave('comp3_site_variation4_v03.png', width = 8, height = 7, units = 'in', dpi = 300, path = '../experiments')
+```
+
+
+# Figure 4
+```{r}
+# Figure 4
+p4 <- ggplot(full_res_avg, aes(x = Model, y = R2_score_test, fill = Split)) +
+  scale_fill_manual(values = c("Pooled Split" = "#20B15C", "Site Split" = "#E2B40E"),
+                    labels = c("Pooled", "Stratified by Site")) +
+  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.5, alpha = 0.5) +
+  geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
+  scale_x_discrete(labels = c("ESM-2 650M", "ESM C 600M", "ESM-2 650M CRVDB", "ESM-2 650M URVDB", "ESM-2 3B Sawhney")) +
+  labs(x = 'Model', y = expression(R^{2})) +
+  theme_bw() +
+  facet_wrap(~Source, nrow = 2) +
+  theme(panel.grid.major.x = element_blank(), legend.position = 'top', legend.title = element_blank())
+
+print(p4)
+
+ggsave('fig4_site_x_pooled_all_models_v03.png', width = 8, height = 5, units = 'in', dpi = 300, path = '../experiments')
+```
+
+# Figure 5
+
+```{r}
+# ProteinGym metrics
+prot_gym <- read_csv("../experiments/compiled_results/protein_gym_plus_var_res.csv", show_col_types = FALSE)
+kermut <- prot_gym[prot_gym$model_name == "Kermut" & prot_gym$fold_variable_name == "fold_random_5",]
+kermut
+
+```
+
+```{r}
+model <- lm(Spearman ~ RVSM + FHVS, data = kermut)
+summary(model)
+
+# R^2
+r2 <- summary(model)$r.squared
+print(r2)
+```
+
+```{r}
+# Figure 5
+kermut$y_pred <- predict(model, newdata = kermut)
+kermut$y_true <- kermut$Spearman
+
+p5 <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
+  geom_point(size = 2.5, alpha = 0.5) +
+  geom_smooth(method='lm', se=FALSE, color = 'black') +
+  theme_bw() +
+  annotate(
+    "text",
+    x = 0.26, y = 0.91,
+    hjust = 0, vjust = 1,
+    size = 4,
+    label = sprintf("R^2 == %.3f", r2),
+    parse = TRUE
+  ) +
+  labs(x = "Spearman (Predicted)", y = "Spearman (Actual)") +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+
+print(p5)
+
+ggsave('fig5_actual_x_predicted_protGym_v03.png', width = 4, height = 3.5, units = 'in', dpi = 300, path = '../experiments')
+```
+
+
+
+# Supplementary Figures
+
+## Supplementary 1
+
+## Supplementary 2
+
+## Supplementary 3
+
+## Supplementary 4
+
+```{r}
+set.seed(55)
+
+# make axes with ellipses
+aa <- c("A", "C", "...", "... ", "W", "Y")
+pos_labels <- c("1", "2", "3", "...", " ", "  ", "... ", "L-2", "L-1", "L")
+
+n_aa <- length(aa)
+L <- length(pos_labels)
+
+# grid
+df <- expand.grid(
+  pos = factor(pos_labels, levels = pos_labels),
+  aa  = factor(aa, levels = aa)
+)
+
+# dataframe for pooled
+test_frac <- 0.2
+df_rand <- df %>%
+  mutate(
+    split = ifelse(runif(n()) < test_frac, "test data", "train data"),
+    scheme = "Pooled"
+  )
+
+# dataframe for stratified by site
+test_pos <- sample(pos_labels, size = 2)
+df_pos <- df %>%
+  mutate(
+    split = ifelse(pos %in% test_pos, "test data", "train data"),
+    scheme = "Stratified by site"
+  )
+
+df_all <- bind_rows(df_rand, df_pos)
+
+# plot
+s4 <- ggplot(df_all, aes(x = pos, y = aa, fill = split)) +
+  geom_tile(color = "black", linewidth = 0.3, linetype = 'dotted') +
+  scale_fill_manual(values = c("train data" = "#e1f7d5", "test data" = "#f1cbff")) +
+  facet_wrap(~ scheme, nrow = 1) +
+  labs(
+    x = "Sequence position index",
+    y = "Amino acid substitution"
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 0.5),
+    legend.title = element_blank()
+  )
+
+print(s4)
+
+ggsave('supp_pooled_site_schematic.png', width = 8, height = 2.5, units = 'in', dpi = 300, path = '../experiments')
+```
+
+## Supplementary 5
+
+## Supplementary 6
+
+## Supplementary 7
+
+## did we stil want this as a supplementary figure? pooled v stratified by site performance (Spearman)
+
+```{r}
+p4supp <- ggplot(full_res_avg, aes(x = Model, y = rho_score_test, fill = Split)) +
+  scale_fill_manual(values = c("Pooled Split" = "#20B15C", "Site Split" = "#E2B40E"),
+                    labels = c("Pooled", "Stratified by Site")) +
+  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.5, alpha = 0.5) +
+  geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
+  scale_x_discrete(labels = c("ESM-2 650M", "ESM C 600M", "ESM-2 650M CRVDB", "ESM-2 650M URVDB", "ESM-2 3B Sawhney")) +
+  labs(x = 'Model', y = expression(rho)) +
+  theme_bw() +
+  facet_wrap(~Source, nrow = 2) +
+  theme(panel.grid.major.x = element_blank(), legend.position = 'top', legend.title = element_blank())
+
+print(p4supp)
+
+#ggsave('supp4_site_x_pooled_spearman.png', width = 8, height = 5, units = 'in', dpi = 300, path = '../experiments')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
