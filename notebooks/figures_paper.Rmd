@@ -150,37 +150,51 @@ print(fig1)
 
 ```{r}
 # Figure 2 A
-lassoCV_AVG <- read_csv("../experiments/compiled_results/lassoCV_AVG_all.csv", show_col_types = FALSE)
-lassoCV_AVG
+lassoCV_AVG <- read_csv("../experiments/compiled_results/res_lassoCV_x_AVG.csv", show_col_types = FALSE)
 
+lassoCV_AVG
+```
+
+
+```{r}
 p2a <- ggplot(lassoCV_AVG, aes(x = R2_AVG, y = R2_ESM2_650M, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_point(size = 2.5, alpha = 0.55, stroke = 0) +
-  geom_smooth(method = 'lm', se = FALSE) +
+  geom_point(size = 3, alpha = 0.55, stroke=0) +
+  geom_line(stat="smooth",method = "lm", size = 0.8, alpha = 0.55) +
   geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
+  
   theme_bw() +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
-  labs(
-    y = expression(paste(R^{2}, ' transfer learning')),
-    x = expression(paste(R^{2}, ' site-means'))) +
-  xlim(-0.55, 0.85) +
-  ylim(-0.55, 0.85)
+  
+  scale_x_continuous(
+    name = expression(paste(italic(R)^{2}, ' site-means')),
+    limits = c(-0.4, 0.85)
+      ) +
+  scale_y_continuous(
+    name = expression(paste(italic(R)^{2}, ' transfer learning')),
+    limits = c(-0.4, 0.85)
+      ) 
+  
+
 
 print(p2a)
 ```
+
 
 ```{r}
 # Figure 2 B
 res_OLS <- read_csv("../experiments/compiled_results/res_OLS.csv", show_col_types = FALSE)
 res_OLS
+```
 
+```{r}
 p2b <- ggplot(res_OLS, aes(x = Model, y = R2, fill = Source)) +
   scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_boxplot(alpha = 0.5) +
+  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, alpha = 0.55, linewidth = 0.25) +
   theme_bw() +
   labs(
     x = 'Independent variable',
-    y = expression(paste(R^2, ' ordinary least squares (OLS)'))
+    y = expression(paste(italic(R)^2, ' ordinary least squares (OLS)'))
     ) +
   theme(
     legend.position = 'none',
@@ -204,14 +218,16 @@ shared_legend <- get_legend(
 # Compose figure 2
 fig2 <- plot_grid(
   shared_legend,
-  plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), rel_widths = c(1, 1)),
+  plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), 
+            label_fontface = "plain", rel_widths = c(1, 1)),
   ncol = 1,
   rel_heights = c(0.07, 1)
 )
 
-print(fig2)
 
-ggsave('comp2_lassoCV_AVG_OLS_v03.png', width = 8, height = 3.5, units = 'in', dpi = 300, path = '../experiments')
+
+print(fig2)
+ggsave(path='../experiments/figures/', filename='comp2_lassoCV_AVG_OLS_v03.png', width = 8, height = 3.5, units = 'in', dpi = 600, bg='white')
 ```
 
 
