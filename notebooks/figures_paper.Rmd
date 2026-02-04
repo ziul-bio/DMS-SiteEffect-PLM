@@ -88,8 +88,6 @@ print(p1b)
 full_pooled_avg <- full_res_avg[full_res_avg$Split == "Pooled Split",] %>% 
  mutate(Model = factor(Model, levels = c('ESM-2 650M', 'ESM C 600M', 'ESM-2-CRVDB', 'ESM-2-URVDB', 'ESM-2 3B Sawhney')))
 
-
-
 p1c <- ggplot(full_pooled_avg, aes(x = Model, y = R2_score_test, fill = Source)) +
   geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.35, alpha = 0.55, linewidth = 0.25) +
   scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
@@ -99,28 +97,61 @@ p1c <- ggplot(full_pooled_avg, aes(x = Model, y = R2_score_test, fill = Source))
   scale_y_continuous(name=expression(italic(R)^2)) +
   
   theme_bw() +
-  theme(
-    legend.position = 'none',
+
+   theme(
+    legend.position = 'none',      
+    legend.title = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.y = element_blank(),
-    legend.title = element_blank()
-  )
-  
-print(p1c)
+) 
+
+p1c 
+
+
+
+# Figure 1 C - version 2
+# full_pooled_avg <- full_res_avg[full_res_avg$Split == "Pooled Split",] %>% 
+#  mutate(Model = factor(Model, levels = c('ESM-2 650M', 'ESM C 600M', 'ESM-2-CRVDB', 'ESM-2-URVDB', 'ESM-2 3B Sawhney')))
+# 
+# p1c <- ggplot(full_pooled_avg, aes(x = Model, y = R2_score_test, fill = Source)) +
+#   geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.35, alpha = 0.55, linewidth = 0.25, key_glyph='rect') +
+#   scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+#   geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
+#   
+#   scale_x_discrete(name='Model') +
+#   scale_y_continuous(name=expression(italic(R)^2)) +
+#   
+#   theme_bw() +
+# 
+#    theme(
+#     legend.position = c(1, 1.2),      
+#     legend.justification = c("right", "top"),
+#     legend.direction = "horizontal",
+#     legend.title = element_blank(),
+#     panel.grid.major.x = element_blank(),
+#     panel.grid.minor.y = element_blank(),
+#     plot.margin = margin(t = 50, r = 9, b = 9, l = 9),
+# ) 
+# 
+#   
+# p1c 
 ```
 
 
 
+
+
 ## Composition
-```{r,width = 8, height = 7}
+```{r,fig.width = 8, fig.height = 7}
 # Extract the shared legend from one of the plots
 shared_legend <- get_legend(
   p1b + theme(
     legend.position = "top",
-    legend.justification = "right",
+    legend.justification = c("right", "top"),
     legend.direction = "horizontal"
   )
 )
+
 
 # Specify positioning for figure composition
 fig1_top <- plot_grid(p1a, p1b, ncol = 2, labels = c('A', 'B'), label_fontface = "plain")
@@ -132,7 +163,7 @@ fig1 <- plot_grid(
   shared_legend,
   fig1_bottom,
   ncol = 1,
-  rel_heights = c(1, 0.07, 1)
+  rel_heights = c(1, 0.15, 1)
 )
 
 print(fig1)
@@ -196,21 +227,24 @@ p2b <- ggplot(res_OLS, aes(x = Model, y = R2, fill = Source)) +
     x = 'Independent variable',
     y = expression(paste(italic(R)^2, ' ordinary least squares (OLS)'))
     ) +
+  
   theme(
     legend.position = 'none',
-    panel.grid.major.x = element_blank()
-  )
+    legend.title = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.y = element_blank(),
+) 
   
 print(p2b)
 ```
 
 ## Composition
-```{r}
+```{r, fig.width=8, fig.height=4}
 # Extract the shared legend from one of the plots
 shared_legend <- get_legend(
   p1b + theme(
     legend.position = "top",
-    legend.justification = "center",
+    legend.justification = c("right", "top"),
     legend.direction = "horizontal"
   )
 )
@@ -221,13 +255,12 @@ fig2 <- plot_grid(
   plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), 
             label_fontface = "plain", rel_widths = c(1, 1)),
   ncol = 1,
-  rel_heights = c(0.07, 1)
+  rel_heights = c(0.1, 1)
 )
 
 
-
 print(fig2)
-ggsave(path='../experiments/figures/', filename='comp2_lassoCV_AVG_OLS_v03.png', width = 8, height = 3.5, units = 'in', dpi = 600, bg='white')
+#ggsave(path='../experiments/figures/', filename='comp2_lassoCV_AVG_OLS_v03.png', width = 8, height = 4, units = 'in', dpi = 600, bg='white')
 ```
 
 
@@ -239,6 +272,7 @@ res_var <- res_var[res_var$Split == "Pooled Split",]
 res_var
 ```
 
+
 ```{r}
 # Figure 3 A
 corr_viral <- cor.test(res_var[res_var$Source == "viral",]$RVSM, res_var[res_var$Source == "viral",]$R2_score_test)
@@ -246,15 +280,15 @@ corr_cellular <- cor.test(res_var[res_var$Source == "cellular",]$RVSM, res_var[r
 
 p3a <- ggplot(res_var, aes(x = RVSM, y = R2_score_test, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_point(size = 2.5, alpha = 0.5) +
-  geom_smooth(method = 'lm', se = FALSE) +
+  geom_point(size = 3, alpha = 0.55, stroke=0) +
+  geom_line(stat="smooth",method = "lm", size = 0.8, alpha = 0.55) +
   annotate(
     "text",
     x = 0.401, y = 0.82,
     hjust = 0, vjust = 1,
     size = 4,
     label = sprintf("r = %.3f", corr_viral$estimate),
-    color = '#D55E00'
+    color = '#D55E00B3'
   ) +
   annotate(
     "text",
@@ -262,17 +296,20 @@ p3a <- ggplot(res_var, aes(x = RVSM, y = R2_score_test, color = Source)) +
     hjust = 0, vjust = 1,
     size = 4,
     label = sprintf("r = %.3f", corr_cellular$estimate),
-    color = '#0072B2'
+    color = '#0072B2B3'
   ) +
   theme_bw() +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  
   labs(
-    y = expression(paste(R^{2}, ' transfer learning')),
+    y = expression(paste(italic(R)^2, ' transfer learning')),
     x = "Relative variability of site means"
   )
 
 print(p3a)
 ```
+
+
 
 ```{r}
 # Figure 3 B
@@ -281,15 +318,16 @@ corr_RF_cellular <- cor.test(res_var[res_var$Source == "cellular",]$RVSM, res_va
 
 p3b <- ggplot(res_var, aes(x = RVSM, y = FHVS, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_point(size = 2.5, alpha = 0.5) +
-  geom_smooth(method = 'lm', se = FALSE) +
+  geom_point(size = 3, alpha = 0.55, stroke=0) +
+  #geom_smooth(method = 'lm', se = FALSE) +
+  geom_line(stat="smooth",method = "lm", size = 0.8, alpha = 0.55) +
   annotate(
     "text",
     x = 0.7, y = 0.90,
     hjust = 0, vjust = 1,
     size = 4,
     label = sprintf("r = %.3f", corr_RF_viral$estimate),
-    color = '#D55E00'
+    color = '#D55E00B3'
   ) +
   annotate(
     "text",
@@ -297,7 +335,7 @@ p3b <- ggplot(res_var, aes(x = RVSM, y = FHVS, color = Source)) +
     hjust = 0, vjust = 1,
     size = 4,
     label = sprintf("r = %.3f", corr_RF_cellular$estimate),
-    color = '#0072B2'
+    color = '#0072B2B3'
   ) +
   theme_bw() +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
@@ -308,13 +346,14 @@ print(p3b)
 
 ```{r}
 # Figure 3 C -- unfinished
-p3c <- ggplot(res_var, aes(x = FHVS, y = R2_score_test)) +
+p3c <- ggplot(res_var, aes(x = FHVS, y = R2_score_test, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_point(size = 2.5, alpha = 0.5, aes(color = Source)) +
-  geom_smooth(method = 'lm', formula = 'y ~ I(x*x) + x', se=FALSE, color = '#636363') +
+  geom_point(size = 3, alpha = 0.55, stroke=0) +
+  geom_smooth(method = 'lm', formula = 'y ~ I(x*x) + x', se=FALSE, size=0.7, color = '#63636380') +
+
   theme_bw() +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
-  labs(y = expression(paste(R^{2}, " transfer learning")),
+  labs(y = expression(paste(italic(R)^2, " transfer learning")),
         x = "Fraction of highly variable sites"
   )
   
@@ -323,12 +362,12 @@ print(p3c)
 
 ```{r}
 # Figure 3 D
-lassoCV_AVG <- read_csv("../experiments/compiled_results/lassoCV_AVG_all.csv", show_col_types = FALSE)
+lassoCV_AVG <- read_csv("../experiments/compiled_results/lassoCV_x_AVG_all.csv", show_col_types = FALSE)
 lassoCV_AVG
 
 p3d <- ggplot(lassoCV_AVG, aes(x = R2_AVG_HVS, y = R2_ESM2_650M_HVS, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_point(size = 2.5, alpha = 0.55, stroke = 0) +
+  geom_point(size = 3, alpha = 0.55, stroke = 0) +
   geom_smooth(method = 'lm', se = FALSE) +
   geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
   theme_bw() +
