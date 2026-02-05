@@ -362,69 +362,83 @@ print(p3c)
 
 ```{r}
 # Figure 3 D
-lassoCV_AVG <- read_csv("../experiments/compiled_results/lassoCV_x_AVG_all.csv", show_col_types = FALSE)
-lassoCV_AVG
+lassoCV_AVG <- read_csv("../experiments/compiled_results/res_lassoCV_x_AVG_HVS.csv", show_col_types = FALSE)
+
 
 p3d <- ggplot(lassoCV_AVG, aes(x = R2_AVG_HVS, y = R2_ESM2_650M_HVS, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
   geom_point(size = 3, alpha = 0.55, stroke = 0) +
-  geom_smooth(method = 'lm', se = FALSE) +
+  geom_line(stat="smooth",method = "lm", size = 0.8, alpha = 0.55) +
   geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
+  
   theme_bw() +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
-  labs(
-    y = expression(paste(R^{2}, ' transfer learning')),
-    x = expression(paste(R^{2}, ' site-means'))) +
-  xlim(-1.00, 0.82) +
-  ylim(-1.00, 0.82)
+  scale_y_continuous(
+    name=expression(paste(italic(R)^2, ' transfer learning')),
+    limits = c(-1, 0.9),
+  ) +
+  scale_x_continuous(
+    name=expression(paste(italic(R)^2, ' site-means')),
+    limits=c(-1, 0.9),
+  )
+
 
 print(p3d)
 ```
 
 ## Composition
 
-```{r}
+```{r, fig.width=8, fig.height=7}
 # Extract the shared legend from one of the plots
 shared_legend <- get_legend(
   p1b + theme(
     legend.position = "top",
-    legend.justification = "center",
+    legend.justification = c("right", "top"),
     legend.direction = "horizontal"
   )
 )
 
-# Compose figure 3
+
+
+
 fig3 <- plot_grid(
-  shared_legend,
-  plot_grid(p3a, p3b, p3c, p3d, ncol = 2, nrow = 2, labels = c('A', 'B', 'C', 'D'), rel_widths = c(1, 1), rel_heights = c(1, 1)),
+  plot_grid(p3a, p3b, ncol = 2, nrow = 1, labels = c('A', 'B'), rel_widths = c(1, 1), rel_heights = c(1, 1), label_fontface = "plain"),
+  plot_grid(shared_legend, ncol = 1, nrow = 1, rel_heights = 1), 
+  plot_grid(p3c, p3d, ncol = 2, nrow = 1, labels = c('C', 'D'), rel_widths = c(1, 1), rel_heights = c(1, 1), label_fontface = "plain"),
   ncol = 1,
-  rel_heights = c(0.07, 1)
+  rel_heights = c(1, 0.1, 1)
 )
 
 print(fig3)
-
-ggsave('comp3_site_variation4_v03.png', width = 8, height = 7, units = 'in', dpi = 300, path = '../experiments')
+#ggsave(path = '../experiments/figures/', 'comp3_site_variation4_v03.png', width = 8, height = 7, units = 'in', dpi = 600, bg='white')
 ```
 
 
 # Figure 4
 ```{r}
 # Figure 4
-p4 <- ggplot(full_res_avg, aes(x = Model, y = R2_score_test, fill = Split)) +
+full_res_avg_df = full_res_avg %>% 
+  mutate(Model = factor(Model, levels = c('ESM-2 650M', 'ESM C 600M', 'ESM-2-CRVDB', 'ESM-2-URVDB', 'ESM-2 3B Sawhney')))
+
+
+p4 <- ggplot(full_res_avg_df, aes(x = Model, y = R2_score_test, fill = Split)) +
   scale_fill_manual(values = c("Pooled Split" = "#20B15C", "Site Split" = "#E2B40E"),
                     labels = c("Pooled", "Stratified by Site")) +
-  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.5, alpha = 0.5) +
+  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.5, alpha = 0.55, linewidth = 0.25) +
   geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
-  scale_x_discrete(labels = c("ESM-2 650M", "ESM C 600M", "ESM-2 650M CRVDB", "ESM-2 650M URVDB", "ESM-2 3B Sawhney")) +
-  labs(x = 'Model', y = expression(R^{2})) +
-  theme_bw() +
+  
+  labs(x = 'Model', y = expression(italic(R)^2)) +
+  
   facet_wrap(~Source, nrow = 2) +
+  
+  theme_bw() +
   theme(panel.grid.major.x = element_blank(), legend.position = 'top', legend.title = element_blank())
 
 print(p4)
+#ggsave(path = '../experiments/figures/', 'fig4_site_x_pooled_all_models_v03.png', width = 8, height = 5, units = 'in', dpi = 600)
 
-ggsave('fig4_site_x_pooled_all_models_v03.png', width = 8, height = 5, units = 'in', dpi = 300, path = '../experiments')
 ```
+
 
 # Figure 5
 
