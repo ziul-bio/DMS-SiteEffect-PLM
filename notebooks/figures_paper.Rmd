@@ -445,12 +445,56 @@ print(p4)
 ```{r}
 # ProteinGym metrics
 prot_gym <- read_csv("../experiments/compiled_results/protein_gym_plus_var_res.csv", show_col_types = FALSE)
-kermut <- prot_gym[prot_gym$model_name == "Kermut" & prot_gym$fold_variable_name == "fold_random_5",]
-kermut
 
+
+prot_gym <- prot_gym %>%
+  mutate(
+    model_name = case_when(
+    model_name == 'Embeddings - Augmented - ESM1v' ~ 'ESM1v',
+    model_name == 'Embeddings - Augmented - MSA Transformer' ~ 'MSA Transformer',
+    model_name == 'Embeddings - Augmented - Tranception' ~ 'Tranception',
+    TRUE ~ model_name  # keep everything else as-is
+    ),
+    
+    model_name = factor(model_name, levels=c('Kermut', 'ProteinNPT', 'MSA Transformer', 'Tranception', 'ESM1v')),
+    
+    fold_variable_name = case_when(
+    fold_variable_name == 'fold_contiguous_5' ~ 'contiguous',
+    fold_variable_name == 'fold_modulo_5' ~ 'modulo',
+    fold_variable_name == 'fold_random_5' ~ 'random',
+    TRUE ~ model_name  # keep everything else as-is
+    ),
+  ) %>%
+  filter(model_name %in% c('Kermut', 'ProteinNPT', 'MSA Transformer', 'Tranception', 'ESM1v'))
+
+
+
+
+prot_gym
 ```
 
+
+```{r, fig.width=8, fig.height=4}
+p5a <- ggplot(prot_gym, aes(x=model_name, y=Spearman, fill=fold_variable_name)) +
+  geom_boxplot() +
+  geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
+  theme_bw() +
+  theme(
+    legend.title = element_blank(),
+    legend.position = 'top',
+  ) +
+  scale_y_continuous(name=Spearman~rho) +
+  scale_x_discrete(name='')
+
+
+p5a
+```
+
+
 ```{r}
+kermut <- prot_gym[prot_gym$model_name == "Kermut" & prot_gym$fold_variable_name == "random",]
+kermut
+
 model <- lm(Spearman ~ RVSM + FHVS, data = kermut)
 summary(model)
 
@@ -459,30 +503,83 @@ r2 <- summary(model)$r.squared
 print(r2)
 ```
 
-```{r}
+```{r, fig.width=5, fig.height=4}
 # Figure 5
 kermut$y_pred <- predict(model, newdata = kermut)
 kermut$y_true <- kermut$Spearman
 
-p5 <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
-  geom_point(size = 2.5, alpha = 0.5) +
-  geom_smooth(method='lm', se=FALSE, color = 'black') +
+p5b <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
+  geom_smooth(method='lm', se=FALSE, color = '#00000080', size=0.5) +
+  geom_point(size=3, alpha=0.7, color='#26456EFF', stroke=0) +
   theme_bw() +
   annotate(
     "text",
     x = 0.26, y = 0.91,
     hjust = 0, vjust = 1,
     size = 4,
-    label = sprintf("R^2 == %.3f", r2),
+    label = paste(expression(italic(R)^2), sprintf("== %.3f", r2)),
+    parse = TRUE
+  ) +
+  labs(x = bquote(Spearman~rho~"(Predicted)"), y = bquote(Spearman~rho~"(Actual)")) +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+
+print(p5b)
+
+#ggsave(path = '../experiments/figures/', 'fig5_actual_x_predicted_protGym_v03.3.png', width = 4, height = 3.5, units = 'in', dpi = 300, )
+```
+
+
+
+
+
+
+
+
+
+
+```{r, fig.width=6, fig.height=4}
+library(MASS)
+
+dens <- kde2d(kermut$y_pred, kermut$y_true, n = 150)
+
+ix <- findInterval(kermut$y_pred, dens$x)
+iy <- findInterval(kermut$y_true, dens$y)
+
+kermut$density <- dens$z[cbind(ix, iy)]
+kermut$density <- kermut$density / max(kermut$density) # normilize
+
+
+
+p5 <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
+  geom_smooth(method='lm', se=FALSE, color = '#00000080', size=0.5) +
+  geom_point(aes(color = density), size=2, alpha=0.8, stroke=0) +
+  scale_color_viridis_c(name = "Point density") +
+  theme_bw() +
+  annotate(
+    "text",
+    x = 0.26, y = 0.91,
+    hjust = 0, vjust = 1,
+    size = 4,
+    label = paste(expression(italic(R)^2), sprintf("== %.3f", r2)),
     parse = TRUE
   ) +
   labs(x = "Spearman (Predicted)", y = "Spearman (Actual)") +
-  theme(legend.position = "top", panel.grid.minor = element_blank())
+  theme(
+    legend.position = "right", 
+    #legend.direction = "horizontal",
+    panel.grid.minor = element_blank(),
+    legend.title = element_text(size = 10, margin = margin(b = 15, l=-10)),
+    #legend.title = element_text(size = 10, margin = margin(b = 5, l=15)),
+    legend.title.position = 'top',
+    legend.key.size = unit(1.1, "lines"),
+    )
+
 
 print(p5)
-
-ggsave('fig5_actual_x_predicted_protGym_v03.png', width = 4, height = 3.5, units = 'in', dpi = 300, path = '../experiments')
+ggsave(path = '../experiments/figures/', 'fig5_actual_x_predicted_protGym_v03.2.png', width = 5, height = 3.5, units = 'in', dpi = 600)
 ```
+
+
 
 
 
