@@ -41,11 +41,12 @@ p1a <- ggplot(esm2_pooled_avg, aes(x = prot_length, y = R2_score_test, color = S
   geom_line(stat="smooth",method = "lm", size = 0.8, alpha = 0.55) +
   
   scale_x_log10(
-    name=expression(italic(R)^2)
+    name="Protein length",
+    
   ) +
   
   scale_y_continuous(
-    name="Protein Length",
+    name=expression(italic(R)^2),
     limits = c(-0.3, 1),
     breaks = c(0, 0.3, 0.6, 0.9)
   ) +
@@ -80,6 +81,10 @@ p1b <- ggplot(esm2_pooled_avg, aes(x = R2_score_test)) +
 print(p1b)
 ```
 
+```{r}
+# T test
+t.test(R2_score_test ~ Source, data = esm2_pooled_avg)
+```
 
 
 
@@ -106,39 +111,53 @@ p1c <- ggplot(full_pooled_avg, aes(x = Model, y = R2_score_test, fill = Source))
 ) 
 
 p1c 
-
-
-
-# Figure 1 C - version 2
-# full_pooled_avg <- full_res_avg[full_res_avg$Split == "Pooled Split",] %>% 
-#  mutate(Model = factor(Model, levels = c('ESM-2 650M', 'ESM C 600M', 'ESM-2-CRVDB', 'ESM-2-URVDB', 'ESM-2 3B Sawhney')))
-# 
-# p1c <- ggplot(full_pooled_avg, aes(x = Model, y = R2_score_test, fill = Source)) +
-#   geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.35, alpha = 0.55, linewidth = 0.25, key_glyph='rect') +
-#   scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-#   geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
-#   
-#   scale_x_discrete(name='Model') +
-#   scale_y_continuous(name=expression(italic(R)^2)) +
-#   
-#   theme_bw() +
-# 
-#    theme(
-#     legend.position = c(1, 1.2),      
-#     legend.justification = c("right", "top"),
-#     legend.direction = "horizontal",
-#     legend.title = element_blank(),
-#     panel.grid.major.x = element_blank(),
-#     panel.grid.minor.y = element_blank(),
-#     plot.margin = margin(t = 50, r = 9, b = 9, l = 9),
-# ) 
-# 
-#   
-# p1c 
 ```
 
 
 
+```{r}
+# T-test
+full_pooled_avg %>%
+  group_by(Model) %>%
+  summarise(
+    mean_viral = mean(R2_score_test[Source == "viral"], na.rm = TRUE),
+    mean_cellular = mean(R2_score_test[Source == "cellular"], na.rm = TRUE),
+    p_value = t.test(R2_score_test ~ Source)$p.value
+  ) %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01  ~ "**",
+      p_value < 0.05  ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+
+# with FDR
+# full_pooled_avg %>%
+#   group_by(Model) %>%
+#   summarise(
+#     mean_viral = mean(R2_score_test[Source == "viral"], na.rm = TRUE),
+#     mean_cellular = mean(R2_score_test[Source == "cellular"], na.rm = TRUE),
+#     p_value = t.test(R2_score_test ~ Source)$p.value
+#   ) %>%
+#   mutate(
+#     p_adj = p.adjust(p_value, method = "BH"),
+#     significance = case_when(
+#       p_adj < 0.001 ~ "***",
+#       p_adj < 0.01  ~ "**",
+#       p_adj < 0.05  ~ "*",
+#       TRUE ~ "ns"
+#     )
+#   )
+```
+
+```{r}
+sprintf("%.5f", 6.197804e-03)
+
+sqrt((0.107 / 5) + (0.303/6))
+```
 
 
 ## Composition
@@ -167,7 +186,6 @@ fig1 <- plot_grid(
 )
 
 print(fig1)
-
 #ggsave(path = '../experiments/figures', 'comp1_pLMs_res_v03.png', width = 8, height = 7, units = 'in', dpi = 600, bg='white')
 ```
 
@@ -195,7 +213,10 @@ p2a <- ggplot(lassoCV_AVG, aes(x = R2_AVG, y = R2_ESM2_650M, color = Source)) +
   geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
   
   theme_bw() +
-  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  theme(
+    legend.title = element_blank(),
+    legend.position = 'top', 
+    panel.grid.minor = element_blank()) +
   
   scale_x_continuous(
     name = expression(paste(italic(R)^{2}, ' site-means')),
@@ -207,7 +228,7 @@ p2a <- ggplot(lassoCV_AVG, aes(x = R2_AVG, y = R2_ESM2_650M, color = Source)) +
       ) 
   
 
-
+ggsave(path='../experiments/figures/', filename='fig2_lassoCV_X_AVG.png', width = 4, height = 3.5, units = 'in', dpi = 600, bg='white')
 print(p2a)
 ```
 
@@ -303,7 +324,7 @@ p3a <- ggplot(res_var, aes(x = RVSM, y = R2_score_test, color = Source)) +
   
   labs(
     y = expression(paste(italic(R)^2, ' transfer learning')),
-    x = "Relative variability of site means"
+    x = "Relative variability of site means (RVSM)"
   )
 
 print(p3a)
@@ -339,7 +360,7 @@ p3b <- ggplot(res_var, aes(x = RVSM, y = FHVS, color = Source)) +
   ) +
   theme_bw() +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
-  labs(y = 'Fraction of highly variable sites', x = 'Relative variability of site means')
+  labs(y = 'Fraction of highly variable sites (FHVS)', x = 'Relative variability of site means (RVSM)')
 
 print(p3b)
 ```
@@ -354,7 +375,7 @@ p3c <- ggplot(res_var, aes(x = FHVS, y = R2_score_test, color = Source)) +
   theme_bw() +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
   labs(y = expression(paste(italic(R)^2, " transfer learning")),
-        x = "Fraction of highly variable sites"
+        x = "Fraction of highly variable sites (FHVS)"
   )
   
 print(p3c)
@@ -410,7 +431,7 @@ fig3 <- plot_grid(
 )
 
 print(fig3)
-#ggsave(path = '../experiments/figures/', 'comp3_site_variation4_v03.png', width = 8, height = 7, units = 'in', dpi = 600, bg='white')
+ggsave(path = '../experiments/figures/', 'comp3_site_variation4_v04.png', width = 8, height = 7, units = 'in', dpi = 600, bg='white')
 ```
 
 
@@ -422,7 +443,8 @@ full_res_avg_df = full_res_avg %>%
 
 
 p4 <- ggplot(full_res_avg_df, aes(x = Model, y = R2_score_test, fill = Split)) +
-  scale_fill_manual(values = c("Pooled Split" = "#20B15C", "Site Split" = "#E2B40E"),
+  scale_fill_manual(#values = c("Pooled Split" = "#20B15C", "Site Split" = "#E2B40E"),
+                    values = c("Pooled Split" = "#50AE5A", "Site Split" = "#EF9708"),
                     labels = c("Pooled", "Stratified by Site")) +
   geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, width = 0.5, alpha = 0.55, linewidth = 0.25) +
   geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
@@ -435,8 +457,52 @@ p4 <- ggplot(full_res_avg_df, aes(x = Model, y = R2_score_test, fill = Split)) +
   theme(panel.grid.major.x = element_blank(), legend.position = 'top', legend.title = element_blank())
 
 print(p4)
-#ggsave(path = '../experiments/figures/', 'fig4_site_x_pooled_all_models_v03.png', width = 8, height = 5, units = 'in', dpi = 600)
+#ggsave(path = '../experiments/figures/', 'fig4_site_x_pooled_all_models_v04.png', width = 8, height = 5, units = 'in', dpi = 600)
 
+```
+
+
+```{r}
+
+full_res_avg_df
+
+# T-test
+full_res_avg_df %>%
+  filter(Source == "cellular") %>% 
+  group_by(Model) %>%
+  summarise(
+    mean_poooled = mean(R2_score_test[Split == "Pooled Split"], na.rm = TRUE),
+    mean_site = mean(R2_score_test[Split == "Site Split"], na.rm = TRUE),
+    p_value = t.test(R2_score_test ~ Split)$p.value
+  ) %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01  ~ "**",
+      p_value < 0.05  ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+```
+```{r}
+
+# T-test
+full_res_avg_df %>%
+  filter(Source == "viral") %>% 
+  group_by(Model) %>%
+  summarise(
+    mean_poooled = mean(R2_score_test[Split == "Pooled Split"], na.rm = TRUE),
+    mean_site = mean(R2_score_test[Split == "Site Split"], na.rm = TRUE),
+    p_value = t.test(R2_score_test ~ Split)$p.value
+  ) %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01  ~ "**",
+      p_value < 0.05  ~ "*",
+      TRUE ~ "ns"
+    )
+  )
 ```
 
 
@@ -444,15 +510,15 @@ print(p4)
 
 ```{r}
 # ProteinGym metrics
-prot_gym <- read_csv("../experiments/compiled_results/protein_gym_plus_var_res.csv", show_col_types = FALSE)
+prot_gym <- read_csv("../experiments/compiled_results/protein_gym_plus_var_metrics_pred_success.csv", show_col_types = FALSE)
 
 
 prot_gym <- prot_gym %>%
   mutate(
     model_name = case_when(
-    model_name == 'Embeddings - Augmented - ESM1v' ~ 'ESM1v',
-    model_name == 'Embeddings - Augmented - MSA Transformer' ~ 'MSA Transformer',
-    model_name == 'Embeddings - Augmented - Tranception' ~ 'Tranception',
+    model_name == 'Emb. Aug. ESM1v' ~ 'ESM1v',
+    model_name == 'Emb. Aug. MSA Transformer' ~ 'MSA Transformer',
+    model_name == 'Emb. Aug. Tranception' ~ 'Tranception',
     TRUE ~ model_name  # keep everything else as-is
     ),
     
@@ -468,16 +534,24 @@ prot_gym <- prot_gym %>%
   filter(model_name %in% c('Kermut', 'ProteinNPT', 'MSA Transformer', 'Tranception', 'ESM1v'))
 
 
-
-
 prot_gym
+```
+```{r, fig.width=11}
+library(colorspace)
+hcl_palettes(plot=TRUE)
+divergingx_palettes(plot=TRUE)
+#diverging_hcl(3, palette="Green-Orange")
 ```
 
 
 ```{r, fig.width=8, fig.height=4}
-p5a <- ggplot(prot_gym, aes(x=model_name, y=Spearman, fill=fold_variable_name)) +
-  geom_boxplot() +
+p5a <- ggplot(prot_gym, aes(x=model_name, y=Spearman, fill=fct_reorder(fold_variable_name, Spearman, .desc =TRUE))) +
+  geom_boxplot(alpha=.55) +
   geom_vline(xintercept = 2.5, linetype = 'dashed', color = 'gray', linewidth = 0.5) +
+  scale_fill_manual(values = c("random" = "#50AE5A", "modulo"="#EF9708", "contiguous" = "#E2E2E2"),
+                    labels = c("Pooled", "Modulo", "Contiguous")
+                    ) +
+  #scale_fill_discrete_diverging(palette = "Green-Orange") + 
   theme_bw() +
   theme(
     legend.title = element_blank(),
@@ -509,8 +583,9 @@ kermut$y_pred <- predict(model, newdata = kermut)
 kermut$y_true <- kermut$Spearman
 
 p5b <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
-  geom_smooth(method='lm', se=FALSE, color = '#00000080', size=0.5) +
-  geom_point(size=3, alpha=0.7, color='#26456EFF', stroke=0) +
+  geom_smooth(method='lm', se=FALSE, color = '#00000080', linewidth=0.3) +
+  #geom_point(size=3, alpha=0.7, color='#26456EFF', stroke=0) +
+  geom_point(size=3, alpha=0.7, color='#306A36FF', stroke=0) +
   theme_bw() +
   annotate(
     "text",
@@ -520,7 +595,7 @@ p5b <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
     label = paste(expression(italic(R)^2), sprintf("== %.3f", r2)),
     parse = TRUE
   ) +
-  labs(x = bquote(Spearman~rho~"(Predicted)"), y = bquote(Spearman~rho~"(Actual)")) +
+  labs(x = bquote(Spearman~rho~"(Predicted)"), y = bquote(Spearman~rho~"(ProteinGym)")) +
   theme(legend.position = "top", panel.grid.minor = element_blank())
 
 print(p5b)
@@ -530,6 +605,58 @@ print(p5b)
 
 
 
+```{r}
+cols <- c("Spearman", "R2")
+
+success_df <- prot_gym %>%
+  filter(fold_variable_name == "random") %>%
+  group_by(model_name) %>%
+  summarise(across(all_of(cols), mean), .groups = "drop") %>%
+  arrange(desc(Spearman)) %>%
+  mutate(model_name = fct_reorder(model_name, Spearman, .desc = TRUE))
+
+success_df 
+```
+
+```{r, fig.width=4, fig.height=4}
+p5c <- ggplot(success_df, aes(y=Spearman, x=R2, color=fct_reorder(model_name, Spearman))) +
+  geom_point(size=3, alpha=1) +
+  scale_color_manual(values = c('Kermut'='#2CA02E', 'ProteinNPT'='#2592DB', 'Tranception'='#CF750D', 'MSA Transformer'='#B669E8', 'ESM1v'='#948890')) +
+  geom_smooth(method='lm', se=FALSE, color = '#00000080', linewidth=0.3) +
+  
+  labs(y = bquote(Spearman~rho~"(ProteinGym)"), x = bquote(italic(R)^2~"(Predicted)")) +
+  theme_bw() +
+  theme(
+    legend.title = element_blank(),
+    legend.position='top',
+    legend.key.size = unit(0.05, "in"),
+    
+    ) 
+
+
+p5c <- p5c + guides(color = guide_legend(nrow = 2, byrow = TRUE))
+p5c
+```
+
+
+
+```{r, fig.width=8, fig.height=7}
+# Specify positioning for figure composition
+fig5_top <- plot_grid(p5a, labels = c('A'), label_fontface = "plain")
+fig5_bottom <- plot_grid(p5b, p5c, ncol = 2, labels = c('B', 'C'), label_fontface = "plain", rel_widths = c(1, 1))
+
+# Compose figure 1
+fig5 <- plot_grid(
+  fig5_top,
+  fig5_bottom,
+  ncol = 1,
+  rel_heights = c(1, 1)
+)
+
+print(fig5)
+
+ggsave(path = '../experiments/figures/', 'comp5_protGym_v02.2.png', width = 8, height = 7.5, units = 'in', dpi = 600, bg='white')
+```
 
 
 
@@ -538,45 +665,39 @@ print(p5b)
 
 
 ```{r, fig.width=6, fig.height=4}
-library(MASS)
-
-dens <- kde2d(kermut$y_pred, kermut$y_true, n = 150)
-
-ix <- findInterval(kermut$y_pred, dens$x)
-iy <- findInterval(kermut$y_true, dens$y)
-
-kermut$density <- dens$z[cbind(ix, iy)]
-kermut$density <- kermut$density / max(kermut$density) # normilize
-
-
-
-p5 <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
-  geom_smooth(method='lm', se=FALSE, color = '#00000080', size=0.5) +
-  geom_point(aes(color = density), size=2, alpha=0.8, stroke=0) +
-  scale_color_viridis_c(name = "Point density") +
-  theme_bw() +
-  annotate(
-    "text",
-    x = 0.26, y = 0.91,
-    hjust = 0, vjust = 1,
-    size = 4,
-    label = paste(expression(italic(R)^2), sprintf("== %.3f", r2)),
-    parse = TRUE
-  ) +
-  labs(x = "Spearman (Predicted)", y = "Spearman (Actual)") +
-  theme(
-    legend.position = "right", 
-    #legend.direction = "horizontal",
-    panel.grid.minor = element_blank(),
-    legend.title = element_text(size = 10, margin = margin(b = 15, l=-10)),
-    #legend.title = element_text(size = 10, margin = margin(b = 5, l=15)),
-    legend.title.position = 'top',
-    legend.key.size = unit(1.1, "lines"),
-    )
-
-
-print(p5)
-ggsave(path = '../experiments/figures/', 'fig5_actual_x_predicted_protGym_v03.2.png', width = 5, height = 3.5, units = 'in', dpi = 600)
+# library(MASS)
+# 
+# dens <- kde2d(kermut$y_pred, kermut$y_true, n = 150)
+# ix <- findInterval(kermut$y_pred, dens$x)
+# iy <- findInterval(kermut$y_true, dens$y)
+# kermut$density <- dens$z[cbind(ix, iy)]
+# kermut$density <- kermut$density / max(kermut$density) # normilize
+# 
+# p5 <- ggplot(kermut, aes(x = y_pred, y = y_true)) +
+#   geom_smooth(method='lm', se=FALSE, color = '#00000080', size=0.5) +
+#   geom_point(aes(color = density), size=2, alpha=0.8, stroke=0) +
+#   scale_color_viridis_c(name = "Point density") +
+#   theme_bw() +
+#   annotate(
+#     "text",
+#     x = 0.26, y = 0.91,
+#     hjust = 0, vjust = 1,
+#     size = 4,
+#     label = paste(expression(italic(R)^2), sprintf("== %.3f", r2)),
+#     parse = TRUE
+#   ) +
+#   labs(x = "Spearman (Predicted)", y = "Spearman (Actual)") +
+#   theme(
+#     legend.position = "right", 
+#     #legend.direction = "horizontal",
+#     panel.grid.minor = element_blank(),
+#     legend.title = element_text(size = 10, margin = margin(b = 15, l=-10)),
+#     #legend.title = element_text(size = 10, margin = margin(b = 5, l=15)),
+#     legend.title.position = 'top',
+#     legend.key.size = unit(1.1, "lines"),
+#     )
+# print(p5)
+#ggsave(path = '../experiments/figures/', 'fig5_actual_x_predicted_protGym_v03.2.png', width = 5, height = 3.5, units = 'in', dpi = 600)
 ```
 
 
@@ -629,7 +750,7 @@ df_all <- bind_rows(df_rand, df_pos)
 
 # plot
 s4 <- ggplot(df_all, aes(x = pos, y = aa, fill = split)) +
-  geom_tile(color = "black", linewidth = 0.3, linetype = 'dotted') +
+  geom_tile(color = "black", linewidth = 0.1, linetype = 'solid') +
   scale_fill_manual(values = c("train data" = "#e1f7d5", "test data" = "#f1cbff")) +
   facet_wrap(~ scheme, nrow = 1) +
   labs(
@@ -638,6 +759,7 @@ s4 <- ggplot(df_all, aes(x = pos, y = aa, fill = split)) +
   ) +
   theme_bw() +
   theme(
+    legend.position = 'top',
     panel.grid = element_blank(),
     axis.ticks = element_blank(),
     axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 0.5),
@@ -646,7 +768,7 @@ s4 <- ggplot(df_all, aes(x = pos, y = aa, fill = split)) +
 
 print(s4)
 
-ggsave('supp_pooled_site_schematic.png', width = 8, height = 2.5, units = 'in', dpi = 300, path = '../experiments')
+ggsave(path = '../experiments/figures/', 'supp1_pooled_site_schematic_v02.png', width = 8, height = 4, units = 'in', dpi = 600, bg='white')
 ```
 
 ## Supplementary 5
