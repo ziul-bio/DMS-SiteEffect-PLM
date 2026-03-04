@@ -26,11 +26,15 @@ full_res_avg <- full_res %>%
 full_res_avg
 ```
 
+
+
+
 # Figure 1
 ```{r}
 esm2_pooled_avg <- full_res_avg[full_res_avg$Model == "ESM-2 650M" & full_res_avg$Split == "Pooled Split",]
 esm2_pooled_avg
 ```
+
 
 
 ```{r}
@@ -133,24 +137,6 @@ full_pooled_avg %>%
     )
   )
 
-
-# with FDR
-# full_pooled_avg %>%
-#   group_by(Model) %>%
-#   summarise(
-#     mean_viral = mean(R2_score_test[Source == "viral"], na.rm = TRUE),
-#     mean_cellular = mean(R2_score_test[Source == "cellular"], na.rm = TRUE),
-#     p_value = t.test(R2_score_test ~ Source)$p.value
-#   ) %>%
-#   mutate(
-#     p_adj = p.adjust(p_value, method = "BH"),
-#     significance = case_when(
-#       p_adj < 0.001 ~ "***",
-#       p_adj < 0.01  ~ "**",
-#       p_adj < 0.05  ~ "*",
-#       TRUE ~ "ns"
-#     )
-#   )
 ```
 
 ```{r}
@@ -158,6 +144,40 @@ sprintf("%.5f", 6.197804e-03)
 
 sqrt((0.107 / 5) + (0.303/6))
 ```
+
+
+
+# T-tes across models base ESM-2 (cellular) and fine-tuned ESM-2 (viral) models.
+
+```{r}
+full_pooled_avg %>%
+  mutate(Model_Source = interaction(Model, Source, sep = " ")) %>% 
+  filter(Model_Source %in% c("ESM-2 650M cellular", "ESM-2 650M viral")) %>%
+  t.test(R2_score_test ~ Model_Source, data = .)
+```
+
+```{r}
+full_pooled_avg %>%
+  mutate(Model_Source = interaction(Model, Source, sep = " ")) %>% 
+  filter(Model_Source %in% c("ESM-2 650M cellular", "ESM-2-CRVDB viral")) %>%
+  t.test(R2_score_test ~ Model_Source, data = .)
+
+```
+
+```{r}
+full_pooled_avg %>%
+  mutate(Model_Source = interaction(Model, Source, sep = " ")) %>% 
+  filter(Model_Source %in% c("ESM-2 650M cellular", "ESM-2-URVDB viral")) %>%
+  t.test(R2_score_test ~ Model_Source, data = .)
+```
+
+```{r}
+full_pooled_avg %>%
+  mutate(Model_Source = interaction(Model, Source, sep = " ")) %>% 
+  filter(Model_Source %in% c("ESM-2 650M cellular", "ESM-2 3B Sawhney viral")) %>%
+  t.test(R2_score_test ~ Model_Source, data = .)
+```
+
 
 
 ## Composition
@@ -285,6 +305,14 @@ print(fig2)
 ```
 
 
+
+
+
+
+
+
+
+
 # Figure 3
 ```{r}
 # Load variability metrics results
@@ -331,13 +359,31 @@ print(p3a)
 ```
 
 
-
 ```{r}
 # Figure 3 B
+p3b <- ggplot(res_var, aes(x = FHVS, y = R2_score_test, color = Source)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 3, alpha = 0.55, stroke=0) +
+  geom_smooth(method = 'lm', formula = 'y ~ I(x*x) + x', se=FALSE, size=0.7, color = '#63636380') +
+
+  theme_bw() +
+  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
+  labs(y = expression(paste(italic(R)^2, " transfer learning")),
+        x = "Fraction of highly variable sites (FHVS)"
+  )
+  
+print(p3b)
+```
+
+
+
+
+```{r}
+# Figure 3 C
 corr_RF_viral <- cor.test(res_var[res_var$Source == "viral",]$RVSM, res_var[res_var$Source == "viral",]$FHVS)
 corr_RF_cellular <- cor.test(res_var[res_var$Source == "cellular",]$RVSM, res_var[res_var$Source == "cellular",]$FHVS)
 
-p3b <- ggplot(res_var, aes(x = RVSM, y = FHVS, color = Source)) +
+p3c <- ggplot(res_var, aes(x = RVSM, y = FHVS, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
   geom_point(size = 3, alpha = 0.55, stroke=0) +
   #geom_smooth(method = 'lm', se = FALSE) +
@@ -362,24 +408,10 @@ p3b <- ggplot(res_var, aes(x = RVSM, y = FHVS, color = Source)) +
   theme(legend.position = 'none', panel.grid.minor = element_blank()) +
   labs(y = 'Fraction of highly variable sites (FHVS)', x = 'Relative variability of site means (RVSM)')
 
-print(p3b)
-```
-
-```{r}
-# Figure 3 C -- unfinished
-p3c <- ggplot(res_var, aes(x = FHVS, y = R2_score_test, color = Source)) +
-  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_point(size = 3, alpha = 0.55, stroke=0) +
-  geom_smooth(method = 'lm', formula = 'y ~ I(x*x) + x', se=FALSE, size=0.7, color = '#63636380') +
-
-  theme_bw() +
-  theme(legend.position = 'none', panel.grid.minor = element_blank()) +
-  labs(y = expression(paste(italic(R)^2, " transfer learning")),
-        x = "Fraction of highly variable sites (FHVS)"
-  )
-  
 print(p3c)
 ```
+
+
 
 ```{r}
 # Figure 3 D
@@ -409,7 +441,7 @@ print(p3d)
 
 ## Composition
 
-```{r, fig.width=8, fig.height=7}
+```{r, fig.width=8, fig.height=8}
 # Extract the shared legend from one of the plots
 shared_legend <- get_legend(
   p1b + theme(
@@ -431,12 +463,19 @@ fig3 <- plot_grid(
 )
 
 print(fig3)
-ggsave(path = '../experiments/figures/', 'comp3_site_variation4_v04.png', width = 8, height = 7, units = 'in', dpi = 600, bg='white')
+ggsave(path = '../experiments/figures/', 'comp3_site_variation4_v05.png', width = 8, height = 8, units = 'in', dpi = 600, bg='white')
 ```
 
 
+
+
+
+
+
+
 # Figure 4
-```{r}
+
+```{r, fig.width=8, fig.height=6}
 # Figure 4
 full_res_avg_df = full_res_avg %>% 
   mutate(Model = factor(Model, levels = c('ESM-2 650M', 'ESM C 600M', 'ESM-2-CRVDB', 'ESM-2-URVDB', 'ESM-2 3B Sawhney')))
@@ -453,18 +492,21 @@ p4 <- ggplot(full_res_avg_df, aes(x = Model, y = R2_score_test, fill = Split)) +
   
   facet_wrap(~Source, nrow = 2) +
   
-  theme_bw() +
-  theme(panel.grid.major.x = element_blank(), legend.position = 'top', legend.title = element_blank())
+  theme_bw(14) +
+  theme(
+   legend.title = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.direction = 'horizontal',
+    legend.position = "inside",
+    legend.justification.inside = c(0.98, 0.015),
+     )
 
 print(p4)
-#ggsave(path = '../experiments/figures/', 'fig4_site_x_pooled_all_models_v04.png', width = 8, height = 5, units = 'in', dpi = 600)
-
+ggsave(path = '../experiments/figures/', 'fig4_site_x_pooled_all_models_v05.png', width = 8, height = 6, units = 'in', dpi = 600)
 ```
 
 
 ```{r}
-
-full_res_avg_df
 
 # T-test
 full_res_avg_df %>%
@@ -506,6 +548,8 @@ full_res_avg_df %>%
 ```
 
 
+
+
 # Figure 5
 
 ```{r}
@@ -536,12 +580,6 @@ prot_gym <- prot_gym %>%
 
 prot_gym
 ```
-```{r, fig.width=11}
-library(colorspace)
-hcl_palettes(plot=TRUE)
-divergingx_palettes(plot=TRUE)
-#diverging_hcl(3, palette="Green-Orange")
-```
 
 
 ```{r, fig.width=8, fig.height=4}
@@ -563,6 +601,57 @@ p5a <- ggplot(prot_gym, aes(x=model_name, y=Spearman, fill=fct_reorder(fold_vari
 
 p5a
 ```
+
+
+
+
+```{r}
+
+stat_data <- prot_gym
+stat_data$fold_variable_name <- factor(
+  stat_data$fold_variable_name,
+  levels = c("random", "modulo", "contiguous")
+)
+
+
+models <- unique(stat_data$model_name)
+
+results_list <- lapply(models, function(m) {
+  df_m <- subset(stat_data, model_name == m)
+  
+  fit <- aov(Spearman ~ fold_variable_name, data = df_m)
+  posthoc <- TukeyHSD(fit, "fold_variable_name")
+  
+  data.frame(
+    model = m,
+    comparison = rownames(posthoc$fold_variable_name),
+    p_adj = posthoc$fold_variable_name[, "p adj"]
+  )
+})
+
+
+final_results <- do.call(rbind, results_list) %>%
+  mutate(
+    significance = case_when(
+      p_adj < 0.001 ~ "***",
+      p_adj < 0.01  ~ "**",
+      p_adj < 0.05  ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>% 
+  select(-p_adj) %>% 
+  pivot_wider(
+    names_from = model,
+    values_from = significance,
+   
+  )
+
+
+final_results
+```
+
+
+
 
 
 ```{r}
@@ -624,7 +713,7 @@ p5c <- ggplot(success_df, aes(y=Spearman, x=R2, color=fct_reorder(model_name, Sp
   scale_color_manual(values = c('Kermut'='#2CA02E', 'ProteinNPT'='#2592DB', 'Tranception'='#CF750D', 'MSA Transformer'='#B669E8', 'ESM1v'='#948890')) +
   geom_smooth(method='lm', se=FALSE, color = '#00000080', linewidth=0.3) +
   
-  labs(y = bquote(Spearman~rho~"(ProteinGym)"), x = bquote(italic(R)^2~"(Predicted)")) +
+  labs(y = bquote('Mean'~Spearman~rho~"(ProteinGym)"), x = bquote(italic(R)^2~"of linear model predicting"~Spearman~rho)) +
   theme_bw() +
   theme(
     legend.title = element_blank(),
@@ -655,7 +744,7 @@ fig5 <- plot_grid(
 
 print(fig5)
 
-ggsave(path = '../experiments/figures/', 'comp5_protGym_v02.2.png', width = 8, height = 7.5, units = 'in', dpi = 600, bg='white')
+ggsave(path = '../experiments/figures/', 'comp5_protGym_v02.4.png', width = 8, height = 7.5, units = 'in', dpi = 600, bg='white')
 ```
 
 
