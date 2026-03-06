@@ -219,94 +219,87 @@ print(fig1)
 
 ```{r}
 # Figure 2 A
-lassoCV_AVG <- read_csv("../experiments/compiled_results/res_lassoCV_x_AVG.csv", show_col_types = FALSE)
+#lassoCV_AVG <- read_csv("../experiments/compiled_results/res_lassoCV_x_AVG.csv", show_col_types = FALSE)
+
+lassoCV_AVG <- read_csv("../experiments/compiled_results/res_lassoCV_x_AVG_all_models.csv", show_col_types = FALSE)
 
 lassoCV_AVG
 ```
 
 
-```{r}
+```{r, fig.width=5, fig.height=4}
 p2a <- ggplot(lassoCV_AVG, aes(x = R2_AVG, y = R2_ESM2_650M, color = Source)) +
   scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
   geom_point(size = 3, alpha = 0.55, stroke=0) +
-  geom_line(stat="smooth",method = "lm", size = 0.8, alpha = 0.55) +
+  geom_line(stat="smooth",method = "lm", linewidth = 0.8, alpha = 0.55) +
   geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
   
   theme_bw() +
+  ggtitle("ESM-2 650M") +
   theme(
     legend.title = element_blank(),
-    legend.position = 'top', 
-    panel.grid.minor = element_blank()) +
+    legend.position = 'none', 
+    panel.grid.minor = element_blank(),
+    plot.title=element_text(hjust=0.5, size=11)) +
   
   scale_x_continuous(
     name = expression(paste(italic(R)^{2}, ' site-means')),
-    limits = c(-0.4, 0.85)
+    limits = c(-0.4, 0.9)
       ) +
   scale_y_continuous(
     name = expression(paste(italic(R)^{2}, ' transfer learning')),
-    limits = c(-0.4, 0.85)
+    limits = c(-0.4, 0.9)
       ) 
   
 
-ggsave(path='../experiments/figures/', filename='fig2_lassoCV_X_AVG.png', width = 4, height = 3.5, units = 'in', dpi = 600, bg='white')
+#ggsave(path='../experiments/figures/', filename='fig2_lassoCV_X_AVG.png', width = 4, height = 3.5, units = 'in', dpi = 600, bg='white')
 print(p2a)
 ```
 
 
-```{r}
-# Figure 2 B
-res_OLS <- read_csv("../experiments/compiled_results/res_OLS.csv", show_col_types = FALSE)
-res_OLS
-```
 
-```{r}
-p2b <- ggplot(res_OLS, aes(x = Model, y = R2, fill = Source)) +
-  scale_fill_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
-  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.3, alpha = 0.55, linewidth = 0.25) +
+```{r, fig.width=5, fig.height=4}
+p2b <- ggplot(lassoCV_AVG, aes(x = R2_AVG, y = R2_ESMC_600M, color = Source)) +
+  scale_color_manual(values = c("viral" = "#D55E00", "cellular" = "#0072B2")) +
+  geom_point(size = 3, alpha = 0.55, stroke=0) +
+  geom_line(stat="smooth", method = "lm", linewidth = 0.8, alpha = 0.55) +
+  geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
+  
   theme_bw() +
-  labs(
-    x = 'Independent variable',
-    y = expression(paste(italic(R)^2, ' ordinary least squares (OLS)'))
-    ) +
-  
+  ggtitle("ESMC 600M") +
   theme(
-    legend.position = 'none',
     legend.title = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.y = element_blank(),
-) 
+    legend.position = 'right', 
+    panel.grid.minor = element_blank(),
+    plot.title=element_text(hjust=0.5, size=11)) +
   
+  scale_x_continuous(
+    name = expression(paste(italic(R)^{2}, ' site-means')),
+    limits = c(-0.4, 0.9)
+      ) +
+  scale_y_continuous(
+    name='',
+    #name = expression(paste(italic(R)^{2}, ' transfer learning')),
+    limits = c(-0.4, 0.9)
+      ) 
+  
+
+#ggsave(path='../experiments/figures/', filename='fig2_lassoCV_X_AVG.png', width = 4, height = 3.5, units = 'in', dpi = 600, bg='white')
 print(p2b)
 ```
 
+
+
+
+
 ## Composition
-```{r, fig.width=8, fig.height=4}
-# Extract the shared legend from one of the plots
-shared_legend <- get_legend(
-  p1b + theme(
-    legend.position = "top",
-    legend.justification = c("right", "top"),
-    legend.direction = "horizontal"
-  )
-)
+```{r,fig.width = 8, fig.height = 3.5}
 
-# Compose figure 2
-fig2 <- plot_grid(
-  shared_legend,
-  plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), 
-            label_fontface = "plain", rel_widths = c(1, 1)),
-  ncol = 1,
-  rel_heights = c(0.1, 1)
-)
+fig2 <- plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), label_fontface = "plain", rel_widths = c(0.8, 1))
 
-
+#ggsave(path = '../experiments/figures', 'comp2_lassoCV_AVG_OLS_esm2_esmc.png', width = 8, height = 3.5, units = 'in', dpi = 600, bg='white')
 print(fig2)
-#ggsave(path='../experiments/figures/', filename='comp2_lassoCV_AVG_OLS_v03.png', width = 8, height = 4, units = 'in', dpi = 600, bg='white')
 ```
-
-
-
-
 
 
 
