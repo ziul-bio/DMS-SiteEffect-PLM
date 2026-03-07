@@ -266,7 +266,7 @@ p2b <- ggplot(lassoCV_AVG, aes(x = R2_AVG, y = R2_ESMC_600M, color = Source)) +
   geom_abline(intercept = 0, alpha = 0.5, linetype = 'dashed') +
   
   theme_bw() +
-  ggtitle("ESMC 600M") +
+  ggtitle("ESM C 600M") +
   theme(
     legend.title = element_blank(),
     legend.position = 'right', 
@@ -295,9 +295,10 @@ print(p2b)
 ## Composition
 ```{r,fig.width = 8, fig.height = 3.5}
 
-fig2 <- plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), label_fontface = "plain", rel_widths = c(0.8, 1))
+#fig2 <- plot_grid(p2a, p2b, ncol = 2, labels = c('A', 'B'), label_fontface = "plain", rel_widths = c(0.8, 1))
+fig2 <- plot_grid(p2a, p2b, ncol = 2, label_fontface = "plain", rel_widths = c(0.8, 1))
 
-#ggsave(path = '../experiments/figures', 'comp2_lassoCV_AVG_OLS_esm2_esmc.png', width = 8, height = 3.5, units = 'in', dpi = 600, bg='white')
+ggsave(path = '../experiments/figures', 'comp2_lassoCV_AVG_OLS_esm2_esmc_v02.png', width = 8, height = 3.5, units = 'in', dpi = 600, bg='white')
 print(fig2)
 ```
 
