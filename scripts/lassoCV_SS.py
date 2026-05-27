@@ -34,7 +34,7 @@ def make_seed(dataset_id, rep):
 
 def split_data(df, seed, test_size=0.2):
     """
-    This function randomly splits a dataframe into train, validation data given a seed by mutation site.
+    This function site-stratified splits a dataframe into train and validation data given a seed by mutation site.
     """
     # Extract unique sites and shuffle
     df = df.copy()
