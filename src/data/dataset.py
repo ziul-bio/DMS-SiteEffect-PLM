@@ -112,9 +112,9 @@ class MyDataModule(pl.LightningDataModule):
             mask_token=alphabet.mask_idx,
             no_mask_tokens=[alphabet.cls_idx, alphabet.eos_idx],
             n_tokens=len(alphabet.all_toks),
-            masking_prob=0.4,
-            randomize_prob=0,
-            no_change_prob=0
+            masking_prob=0.15,
+            randomize_prob=0.1,
+            no_change_prob=0.1
         )
     
 
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     print("Running test on the dataset module")
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('--dataDir', type=str, default='data/processed/C-RVDBv29_maxlen1022_20aa/')
+    parser.add_argument('--dataDir', type=str, default='data/RVDB/processed/CRVDBv30prot_maxlen1600_20aa')
     parser.add_argument('--batch_size', type=int, default=1)
     args = parser.parse_args()
 
