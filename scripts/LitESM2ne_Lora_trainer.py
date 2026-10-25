@@ -116,7 +116,7 @@ class MyDataModule(pl.LightningDataModule):
         data = data.query("mutant != 'WT'")
 
         if self.split_strategy == 'site_split':
-            train_df, val_df = split_data(data, seed=args.seed, train_pct=0.8, val_pct=0.2)
+            train_df, val_df = split_data(data, seed=args.seed, test_size=0.2)
         elif self.split_strategy == 'pool_split':
             train_df, val_df = train_test_split(data, test_size=0.2, random_state=args.seed)
         

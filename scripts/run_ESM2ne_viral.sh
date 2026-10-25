@@ -57,7 +57,7 @@ do
 
             echo "Fine-tuning ESM-2 Viral 650M on $dts with strategy $strategy and seed $rep"
             
-            CUDA_VISIBLE_DEVICES=2 python scripts/LitESM2ne_partial_trainer.py \
+            CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}" python -m scripts.LitESM2ne_partial_trainer \
                 -i "data/${source}/metadata/${dts}.csv" \
                 -o "experiments/fineTune/${checkpoint}/${source}/${strategy}/" \
                 --seed $seed \
